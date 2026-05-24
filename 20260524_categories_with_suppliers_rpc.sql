@@ -1,4 +1,5 @@
 ﻿-- Migration #11: RPC to get categories with their suppliers
+-- Fixed: uses CROSS JOIN LATERAL to avoid duplicates
 CREATE OR REPLACE FUNCTION household_chemicals.rpc_categories_with_suppliers()
 RETURNS TABLE (
     category_id INT,
@@ -11,25 +12,29 @@ BEGIN
     SELECT
         pc.id,
         pc.name,
-        COUNT(DISTINCT sup.id)::BIGINT,
+        COUNT(sup.id)::BIGINT,
         COALESCE(
             jsonb_agg(
                 jsonb_build_object(
                     'id', sup.id,
                     'name', sup.name,
-                    'total_receipts', cat_stats.total_receipts,
-                    'total_amount', cat_stats.total_amount,
-                    'total_products', cat_stats.total_products
+                    'total_receipts', COALESCE(cat_stats.total_receipts, 0),
+                    'total_amount', COALESCE(cat_stats.total_amount, 0),
+                    'total_products', COALESCE(cat_stats.total_products, 0)
                 )
                 ORDER BY sup.name
-            ) FILTER (WHERE sup.id IS NOT NULL),
+            ),
             '[]'::jsonb
         )
     FROM household_chemicals.product_categories pc
-    LEFT JOIN household_chemicals.products p ON p.category_id = pc.id AND p.is_active = true
-    LEFT JOIN household_chemicals.receipt_items ri ON ri.product_id = p.id
-    LEFT JOIN household_chemicals.receipts r ON r.id = ri.receipt_id AND r.status = 'confirmed'
-    LEFT JOIN household_chemicals.suppliers sup ON sup.id = r.supplier_id
+    CROSS JOIN LATERAL (
+        SELECT DISTINCT s.id, s.name
+        FROM household_chemicals.products p
+        JOIN household_chemicals.receipt_items ri ON ri.product_id = p.id
+        JOIN household_chemicals.receipts r ON r.id = ri.receipt_id AND r.status = 'confirmed'
+        JOIN household_chemicals.suppliers s ON s.id = r.supplier_id
+        WHERE p.category_id = pc.id AND p.is_active = true
+    ) sup
     LEFT JOIN LATERAL (
         SELECT
             COUNT(DISTINCT r2.id)::BIGINT AS total_receipts,
@@ -44,11 +49,6 @@ BEGIN
     ) cat_stats ON true
     GROUP BY pc.id, pc.name
     ORDER BY pc.name;
-
-    -- If no data found, return empty set
-    IF NOT FOUND THEN
-        RETURN QUERY SELECT 0::INT, ''::TEXT, 0::BIGINT, '[]'::JSONB WHERE false;
-    END IF;
 END;
 $func$;
 
