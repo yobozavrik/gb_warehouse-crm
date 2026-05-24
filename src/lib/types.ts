@@ -1,5 +1,5 @@
 // ============================================================================
-// TypeScript типы для warehouse-crm
+// TypeScript С‚РёРїС‹ РґР»СЏ warehouse-crm
 // ============================================================================
 
 export interface ProductCategory {
@@ -150,6 +150,8 @@ export interface SupplierWithStats extends Supplier {
   payment_percent: number
 }
 
+
+
 export interface User {
   id: string
   auth_user_id: string | null
@@ -247,6 +249,7 @@ export interface DashboardSummary {
     min_stock: number
     deficit: number
   }>
+
   recent_movements: Array<{
     id: string
     product_name: string
@@ -272,4 +275,19 @@ export interface PaginatedResponse<T> {
   page: number
   page_size: number
   total_pages: number
+}
+
+
+
+export interface CategoryWithSuppliers {
+  category_id: number
+  category_name: string
+  supplier_count: number
+  suppliers: Array<{
+    id: number
+    name: string
+    total_receipts: number
+    total_amount: number
+    total_products: number
+  }>
 }

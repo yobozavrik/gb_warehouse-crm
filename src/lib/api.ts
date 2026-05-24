@@ -1,9 +1,5 @@
-import { supabase } from './supabase'
-import type {
-  DashboardSummary, PaginatedResponse, Product, ProductCategory,
-  Warehouse, Shop, Supplier, SupplierWithStats, Receipt, Order, StockMovement,
-  StockBalance, ProductDetail, CategoryGroup, SupplierPayment,
-} from './types'
+﻿import { supabase } from './supabase'
+import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, Receipt, Order, StockMovement, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers } from './types'
 
 // ============================================================================
 // DASHBOARD
@@ -43,7 +39,7 @@ export async function createProduct(product: {
 }): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
-    .insert([{ ...product, unit: product.unit ?? 'шт' }])
+    .insert([{ ...product, unit: product.unit ?? 'С€С‚' }])
     .select()
     .single()
   if (error) throw error
@@ -167,7 +163,16 @@ export async function createSupplierPayment(payment: {
 
 // ============================================================================
 // STOCK BALANCES
+// ============================================================================// ============================================================================
+// CATEGORIES WITH SUPPLIERS
 // ============================================================================
+export async function fetchCategoriesWithSuppliers(): Promise<CategoryWithSuppliers[]> {
+  const { data, error } = await supabase.rpc('rpc_categories_with_suppliers')
+  if (error) throw error
+  return data
+}
+
+
 export async function fetchStockBalances(warehouseId?: number): Promise<StockBalance[]> {
   let query = supabase.from('stock_balances').select('*')
   if (warehouseId) query = query.eq('warehouse_id', warehouseId)
@@ -333,7 +338,7 @@ export async function completeInventory(inventoryId: string): Promise<void> {
 }
 
 // ============================================================================
-// GENERIC TABLE ACCESS (для аудита и простых справочников)
+// GENERIC TABLE ACCESS (РґР»СЏ Р°СѓРґРёС‚Р° Рё РїСЂРѕСЃС‚С‹С… СЃРїСЂР°РІРѕС‡РЅРёРєРѕРІ)
 // ============================================================================
 export async function fetchFromTable<T>(table: string, options?: {
   orderBy?: string; orderAsc?: boolean; limit?: number
@@ -354,3 +359,4 @@ export async function fetchFromTable<T>(table: string, options?: {
 export async function exportStockSummary(warehouseId?: number): Promise<any[]> {
   return fetchStockSummary(warehouseId)
 }
+
