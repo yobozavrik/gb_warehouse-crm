@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { fetchSuppliersWithStats } from '@/lib/api'
 import type { SupplierWithStats } from '@/lib/types'
 import {
   Building2, Package, DollarSign, CalendarDays, Phone, Mail,
-  MapPin, Globe, FileText, User,
+  MapPin, Globe, FileText, User, Factory,
   TrendingUp, Clock, Search, Store, CreditCard,
-  ArrowDownRight,
+  ArrowDownRight, Truck, Globe2, PackageOpen,
 } from 'lucide-react'
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -15,6 +15,20 @@ const CATEGORY_LABELS: Record<string, string> = {
   distributor: 'Дистриб\'ютор',
   importer: 'Імпортер',
   other: 'Інше',
+}
+
+const CATEGORY_ICONS: Record<string, typeof Factory> = {
+  manufacturer: Factory,
+  distributor: Truck,
+  importer: Globe2,
+  other: PackageOpen,
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  manufacturer: 'blue',
+  distributor: 'purple',
+  importer: 'orange',
+  other: 'gray',
 }
 
 export default function SuppliersPage() {
@@ -42,6 +56,27 @@ export default function SuppliersPage() {
     || (s.contact_person && s.contact_person.toLowerCase().includes(search.toLowerCase()))
     || (s.edrpou && s.edrpou.includes(search))
   )
+
+  const categories = useMemo(() => {
+    const groups: { key: string; label: string; suppliers: SupplierWithStats[] }[] = []
+    const catOrder = ['manufacturer', 'distributor', 'importer', 'other', '__uncategorized__']
+    for (const key of catOrder) {
+      let s: SupplierWithStats[]
+      if (key === '__uncategorized__') {
+        s = filtered.filter(x => !x.category)
+      } else {
+        s = filtered.filter(x => x.category === key)
+      }
+      if (s.length > 0) {
+        groups.push({
+          key,
+          label: key === '__uncategorized__' ? 'Без категорії' : CATEGORY_LABELS[key] || key,
+          suppliers: s,
+        })
+      }
+    }
+    return groups
+  }, [filtered])
 
   const totalAmount = filtered.reduce((acc, s) => acc + s.total_amount, 0)
   const totalReceipts = filtered.reduce((acc, s) => acc + s.total_receipts, 0)
@@ -109,13 +144,22 @@ export default function SuppliersPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5 animate-pulse space-y-3">
-              <div className="h-5 bg-gray-200 rounded w-1/2" />
-              <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="grid grid-cols-2 gap-2">
-                {[...Array(4)].map((_, j) => <div key={j} className="h-8 bg-gray-100 rounded" />)}
+        <div className="space-y-6">
+          {[...Array(3)].map((_, ci) => (
+            <div key={ci} className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--color-border-light)]">
+                <div className="h-6 bg-gray-200 rounded w-48 animate-pulse" />
+              </div>
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="animate-pulse space-y-3">
+                    <div className="h-5 bg-gray-200 rounded w-3/4" />
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    <div className="grid grid-cols-2 gap-2">
+                      {[...Array(4)].map((_, j) => <div key={j} className="h-8 bg-gray-100 rounded" />)}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
@@ -127,9 +171,34 @@ export default function SuppliersPage() {
           <p className="text-sm mt-1">Спробуйте змінити пошуковий запит</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(sup => (
-            <div key={sup.id} className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] overflow-hidden hover:shadow-md transition-all">
+        <div className="space-y-6">
+          {categories.map(group => {
+            const catSuppliers = group.suppliers
+            const catAmount = catSuppliers.reduce((a, s) => a + s.total_amount, 0)
+            const catReceipts = catSuppliers.reduce((a, s) => a + s.total_receipts, 0)
+            const catIcon = group.key !== '__uncategorized__' ? CATEGORY_ICONS[group.key] : Store
+
+            return (
+              <div key={group.key} className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] overflow-hidden">
+                <div className="px-5 py-3 border-b border-[var(--color-border-light)] flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center border border-brand-200">
+                      <Building2 className="w-4 h-4 text-[var(--color-brand-600)]" />
+                    </div>
+                    <div>
+                      <h2 className="font-semibold text-[var(--color-text)]">{group.label}</h2>
+                      <p className="text-xs text-[var(--color-text-tertiary)]">
+                        {catSuppliers.length} постачальників · {catReceipts} поставок · {formatCurrency(catAmount)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-medium text-[var(--color-text-tertiary)] bg-[var(--color-surface-subtle)] px-2.5 py-1 rounded-full border border-[var(--color-border-light)]">
+                    {catSuppliers.length}
+                  </span>
+                </div>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {catSuppliers.map(sup => (
+                <div key={sup.id} className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] overflow-hidden hover:shadow-md transition-all">
               <div className="px-5 pt-5 pb-3 border-b border-[var(--color-border-light)]">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3 min-w-0">
@@ -255,6 +324,10 @@ export default function SuppliersPage() {
               )}
             </div>
           ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
