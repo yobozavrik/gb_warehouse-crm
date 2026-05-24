@@ -30,7 +30,7 @@ export default function SuppliersPage() {
   }, [])
 
   const formatCurrency = (v: number) =>
-    new Intl.NumberFormat('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 }).format(v)
+    new Intl.NumberFormat('uk-UA', { style: 'decimal', maximumFractionDigits: 0 }).format(v) + ' грн'
 
   const formatDate = (d: string | null) => {
     if (!d) return '—'
@@ -46,8 +46,8 @@ export default function SuppliersPage() {
   const totalAmount = filtered.reduce((acc, s) => acc + s.total_amount, 0)
   const totalReceipts = filtered.reduce((acc, s) => acc + s.total_receipts, 0)
   const activeLast30 = filtered.filter(s => s.receipts_30d > 0).length
-  const totalDebt = filtered.reduce((acc, s) => acc + s.total_debt, 0)
-  const totalPaid = filtered.reduce((acc, s) => acc + s.total_paid, 0)
+  const totalDebt = filtered.reduce((acc, s) => acc + (s.total_debt ?? 0), 0)
+  const totalPaid = filtered.reduce((acc, s) => acc + (s.total_paid ?? 0), 0)
   const totalPayPercent = totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0
 
   return (
@@ -204,33 +204,33 @@ export default function SuppliersPage() {
                 <Stat
                   icon={<CreditCard className="w-3.5 h-3.5" />}
                   label="Оплачено"
-                  value={formatCurrency(sup.total_paid)}
+                  value={formatCurrency(sup.total_paid ?? 0)}
                   color="emerald"
                 />
                 <Stat
                   icon={<ArrowDownRight className="w-3.5 h-3.5" />}
                   label="Заборгованість"
-                  value={formatCurrency(sup.total_debt)}
-                  color={sup.total_debt > 0 ? 'red' : 'emerald'}
+                  value={formatCurrency(sup.total_debt ?? 0)}
+                  color={(sup.total_debt ?? 0) > 0 ? 'red' : 'emerald'}
                 />
                 <div className="col-span-2">
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-[var(--color-text-tertiary)]">Взаєморозрахунки</span>
-                    <span className="font-semibold text-[var(--color-text)]">{sup.payment_percent}%</span>
+                    <span className="font-semibold text-[var(--color-text)]">{sup.payment_percent ?? 0}%</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"
                       style={{
-                        width: `${sup.payment_percent}%`,
-                        background: sup.payment_percent >= 90 ? 'var(--color-emerald-500, #10b981)'
-                          : sup.payment_percent >= 50 ? 'var(--color-amber-400, #f59e0b)'
+                        width: `${sup.payment_percent ?? 0}%`,
+                        background: (sup.payment_percent ?? 0) >= 90 ? 'var(--color-emerald-500, #10b981)'
+                          : (sup.payment_percent ?? 0) >= 50 ? 'var(--color-amber-400, #f59e0b)'
                           : 'var(--color-red-400, #f87171)'
                       }}
                     />
                   </div>
                   <div className="flex justify-between text-[11px] text-[var(--color-text-tertiary)] mt-0.5">
-                    <span>Оплат: {sup.payment_count}</span>
+                    <span>Оплат: {sup.payment_count ?? 0}</span>
                     <span>{sup.last_payment_date ? `Останній платіж: ${formatDate(sup.last_payment_date)}` : 'Немає оплат'}</span>
                   </div>
                 </div>
