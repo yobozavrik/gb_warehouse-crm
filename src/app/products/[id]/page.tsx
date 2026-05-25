@@ -26,7 +26,11 @@ export default function ProductDetailPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!productId) return
+    if (!productId) {
+      setLoading(false)
+      setError('Невалідний ID товару')
+      return
+    }
     fetchProductDetail(productId)
       .then(setDetail)
       .catch(e => setError(e.message))
@@ -48,7 +52,7 @@ export default function ProductDetailPage() {
 
   const { product, stock, receipts, price_history } = detail
   const supplier = detail.supplier
-  const stockLevel = stock.length > 0 ? stock[0].quantity : 0
+  const stockLevel = stock.reduce((sum, s) => sum + s.quantity, 0)
   const isLowStock = product.min_stock != null && stockLevel <= product.min_stock
   const isOutOfStock = stockLevel <= 0
 

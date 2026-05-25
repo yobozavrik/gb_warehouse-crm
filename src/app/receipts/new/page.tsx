@@ -3,15 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createReceipt, fetchWarehouses, fetchSuppliers } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
+import type { Warehouse, Supplier, Product } from '@/lib/types'
+import { ArrowLeft, Trash2, Save, Search } from 'lucide-react'
+import Link from 'next/link'
 
 function safeNum(v: string): number {
   const n = Number(v)
   return isFinite(n) ? n : 0
 }
-import { supabase } from '@/lib/supabase'
-import type { Warehouse, Supplier, Product } from '@/lib/types'
-import { ArrowLeft, Plus, Trash2, Save, Search } from 'lucide-react'
-import Link from 'next/link'
 
 interface ReceiptLine {
   product_id: number
@@ -77,19 +77,19 @@ export default function NewReceiptPage() {
         notes: form.notes || undefined,
       })
 
-      for (const line of lines) {
-        await supabase.from('receipt_items').insert([{
+      await supabase.from('receipt_items').insert(
+        lines.map(line => ({
           receipt_id: receipt.id,
           product_id: line.product_id,
           quantity: line.quantity,
           price: line.price,
-        }])
-      }
+        }))
+      )
 
       router.push('/receipts')
     } catch (e) {
       console.error(e)
-      alert('Ошибка при создании накладной')
+      alert('Помилка при створенні накладної')
     }
     setSaving(false)
   }
@@ -100,14 +100,14 @@ export default function NewReceiptPage() {
         <Link href="/receipts" className="text-gray-500 hover:text-gray-700">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Новая приходная накладная</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Нова прибуткова накладна</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Номер накладной</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Номер накладної</label>
               <input type="text"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 placeholder="Авто" value={form.receipt_number}
@@ -120,26 +120,26 @@ export default function NewReceiptPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 value={form.warehouse_id} onChange={e => setForm({ ...form, warehouse_id: e.target.value })}
               >
-                <option value="">Выберите склад</option>
+                <option value="">Оберіть склад</option>
                 {warehouses.filter(w => w.type === 'central').map(w => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Поставщик</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Постачальник</label>
               <select
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 value={form.supplier_id} onChange={e => setForm({ ...form, supplier_id: e.target.value })}
               >
-                <option value="">Не выбран</option>
+                <option value="">Не обрано</option>
                 {suppliers.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Примечание</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Примітка</label>
               <input type="text"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
@@ -149,11 +149,11 @@ export default function NewReceiptPage() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Товары в накладной</h2>
+          <h2 className="font-semibold text-gray-900 mb-4">Товари в накладній</h2>
 
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Поиск товара..."
+            <input type="text" placeholder="Пошук товару..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
               value={productSearch} onChange={e => setProductSearch(e.target.value)}
             />
@@ -169,7 +169,7 @@ export default function NewReceiptPage() {
                   </button>
                 ))}
                 {filteredProducts.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400">Ничего не найдено</div>
+                  <div className="px-3 py-2 text-sm text-gray-400">Нічого не знайдено</div>
                 )}
               </div>
             )}
@@ -179,9 +179,9 @@ export default function NewReceiptPage() {
             <thead className="bg-gray-50 text-gray-500">
               <tr>
                 <th className="text-left px-3 py-2 font-medium">Товар</th>
-                <th className="text-right px-3 py-2 font-medium">Количество</th>
-                <th className="text-right px-3 py-2 font-medium">Цена</th>
-                <th className="text-right px-3 py-2 font-medium">Сумма</th>
+                <th className="text-right px-3 py-2 font-medium">Кількість</th>
+                <th className="text-right px-3 py-2 font-medium">Ціна</th>
+                <th className="text-right px-3 py-2 font-medium">Сума</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -226,7 +226,7 @@ export default function NewReceiptPage() {
             </tbody>
             <tfoot>
               <tr className="border-t font-medium">
-                <td className="px-3 py-2">Итого</td>
+                <td className="px-3 py-2">Разом</td>
                 <td className="px-3 py-2 text-right">
                   {lines.reduce((s, l) => s + l.quantity, 0)}
                 </td>
@@ -241,7 +241,7 @@ export default function NewReceiptPage() {
 
           {lines.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-6">
-              Добавьте товары в накладную через поиск выше
+              Додайте товари в накладну через пошук вище
             </p>
           )}
         </div>
@@ -249,11 +249,11 @@ export default function NewReceiptPage() {
         <div className="flex justify-end gap-3">
           <Link href="/receipts"
             className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
-          >Отмена</Link>
+          >Скасувати</Link>
           <button type="submit" disabled={saving || !form.warehouse_id || lines.length === 0}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
           >
-            <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Создать накладную'}
+            <Save className="w-4 h-4" /> {saving ? 'Збереження...' : 'Створити накладну'}
           </button>
         </div>
       </form>

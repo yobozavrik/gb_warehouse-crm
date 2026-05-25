@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createProduct, fetchCategoriesTree, fetchWarehouses, fetchStockBalances, fetchFromTable } from '@/lib/api'
+import { createProduct, fetchCategoriesTree } from '@/lib/api'
 import type { ProductCategory } from '@/lib/types'
+import { ArrowLeft, Save } from 'lucide-react'
+import Link from 'next/link'
 
 function safeNum(v: string | undefined): number | undefined {
   if (!v) return undefined
   const n = Number(v)
   return isFinite(n) ? n : undefined
 }
-import { ArrowLeft, Save } from 'lucide-react'
-import Link from 'next/link'
 
 export default function NewProductPage() {
   const router = useRouter()
@@ -46,7 +46,7 @@ export default function NewProductPage() {
       router.push('/products')
     } catch (e) {
       console.error(e)
-      alert('Ошибка при создании товара')
+      alert('Помилка при створенні товару')
     }
     setSaving(false)
   }
@@ -57,13 +57,13 @@ export default function NewProductPage() {
         <Link href="/products" className="text-gray-500 hover:text-gray-700">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Новый товар</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Новий товар</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Назва *</label>
             <input type="text" required
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
@@ -84,19 +84,19 @@ export default function NewProductPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Категория</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Категорія</label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}
             >
-              <option value="">Без категории</option>
+              <option value="">Без категорії</option>
               {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Единица измерения</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Одиниця виміру</label>
             <select
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })}
@@ -110,21 +110,21 @@ export default function NewProductPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Закупочная цена</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Закупівельна ціна</label>
             <input type="number" step="0.01" min="0"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.purchase_price} onChange={e => setForm({ ...form, purchase_price: e.target.value })}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Мин. остаток</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Мін. залишок</label>
             <input type="number" step="0.001" min="0"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.min_stock} onChange={e => setForm({ ...form, min_stock: e.target.value })}
             />
           </div>
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Опис</label>
             <textarea rows={3}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
               value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
@@ -135,11 +135,11 @@ export default function NewProductPage() {
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Link href="/products"
             className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
-          >Отмена</Link>
+          >Скасувати</Link>
           <button type="submit" disabled={saving || !form.name.trim()}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
           >
-            <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить'}
+            <Save className="w-4 h-4" /> {saving ? 'Збереження...' : 'Створити'}
           </button>
         </div>
       </form>

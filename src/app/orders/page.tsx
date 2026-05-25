@@ -5,8 +5,8 @@ import { fetchOrders, shipOrder } from '@/lib/api'
 import { ShoppingCart, Truck } from 'lucide-react'
 
 const statusLabels: Record<string, string> = {
-  draft: 'Черновик', submitted: 'Ожидает', confirmed: 'Подтверждён',
-  partially_shipped: 'Частично отгружен', shipped: 'Отгружен', cancelled: 'Отменён',
+  draft: 'Чернетка', submitted: 'Очікує', confirmed: 'Підтверджено',
+  partially_shipped: 'Частково відвантажено', shipped: 'Відвантажено', cancelled: 'Скасовано',
 }
 
 const statusColors: Record<string, string> = {
@@ -31,32 +31,32 @@ export default function OrdersPage() {
   useEffect(() => { load() }, [statusFilter])
 
   const handleShip = async (id: string) => {
-    if (!confirm('Отгрузить заявку? Товары будут списаны со склада.')) return
+    if (!confirm('Відвантажити заявку? Товари будуть списані зі складу.')) return
     try {
       await shipOrder(id)
       load()
     } catch (e) {
       console.error(e)
-      alert('Ошибка при отгрузке')
+      alert('Помилка при відвантаженні')
     }
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Заявки магазинов</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Заявки магазинів</h1>
         <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
         >
-          <option value="">Все статусы</option>
-          <option value="submitted">Ожидают</option>
-          <option value="confirmed">Подтверждённые</option>
-          <option value="shipped">Отгруженные</option>
-          <option value="cancelled">Отменённые</option>
+          <option value="">Всі статуси</option>
+          <option value="submitted">Очікують</option>
+          <option value="confirmed">Підтверджені</option>
+          <option value="shipped">Відвантажені</option>
+          <option value="cancelled">Скасовані</option>
         </select>
       </div>
 
-      {loading ? <p className="text-gray-500">Загрузка...</p> : (
+      {loading ? <p className="text-gray-500">Завантаження...</p> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500">
@@ -64,10 +64,10 @@ export default function OrdersPage() {
                 <th className="text-left px-4 py-3 font-medium">Номер</th>
                 <th className="text-left px-4 py-3 font-medium">Магазин</th>
                 <th className="text-left px-4 py-3 font-medium">Статус</th>
-                <th className="text-left px-4 py-3 font-medium">Источник</th>
-                <th className="text-right px-4 py-3 font-medium">Позиций</th>
-                <th className="text-right px-4 py-3 font-medium">Запрошено</th>
-                <th className="text-right px-4 py-3 font-medium">Отгружено</th>
+                <th className="text-left px-4 py-3 font-medium">Джерело</th>
+                <th className="text-right px-4 py-3 font-medium">Позицій</th>
+                <th className="text-right px-4 py-3 font-medium">Запитувалось</th>
+                <th className="text-right px-4 py-3 font-medium">Відвантажено</th>
                 <th className="text-right px-4 py-3 font-medium">Дата</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -87,14 +87,14 @@ export default function OrdersPage() {
                   <td className="px-4 py-3 text-right">{o.total_requested}</td>
                   <td className="px-4 py-3 text-right">{o.total_shipped || 0}</td>
                   <td className="px-4 py-3 text-right text-gray-500">
-                    {o.created_at ? new Date(o.created_at).toLocaleDateString('ru') : '—'}
+                    {o.created_at ? new Date(o.created_at).toLocaleDateString('uk-UA') : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {(o.status === 'submitted' || o.status === 'confirmed') && (
                       <button onClick={() => handleShip(o.id)}
                         className="flex items-center gap-1 text-green-600 hover:text-green-800 text-xs font-medium"
                       >
-                        <Truck className="w-4 h-4" /> Отгрузить
+                        <Truck className="w-4 h-4" /> Відвантажити
                       </button>
                     )}
                   </td>
@@ -105,7 +105,7 @@ export default function OrdersPage() {
           {orders.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <ShoppingCart className="w-12 h-12 mb-2" />
-              <p>Заявок нет</p>
+              <p>Заявок немає</p>
             </div>
           )}
         </div>

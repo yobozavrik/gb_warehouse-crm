@@ -30,9 +30,10 @@ const PERIOD_OPTIONS = [
 ]
 
 const TYPE_LABELS: Record<string, string> = {
-  central: 'Центральний',
   shop: 'Магазин',
-  transit: 'Транзитний',
+  workshop: 'Цех',
+  storage: 'Склад',
+  other: 'Інше',
 }
 
 export default function WarehousesPage() {
@@ -51,7 +52,7 @@ export default function WarehousesPage() {
   useEffect(() => { load(days) }, [days])
 
   const formatCurrency = (v: number) =>
-    new Intl.NumberFormat('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 }).format(v)
+    new Intl.NumberFormat('uk-UA', { style: 'decimal', maximumFractionDigits: 0 }).format(v) + ' ₴'
 
   const daysAgo = (d: string | null) => {
     if (!d) return '—'

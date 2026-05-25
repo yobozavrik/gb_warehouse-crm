@@ -382,9 +382,13 @@ export async function POST(req: NextRequest) {
           .eq('chat_id', chatId)
           .single()
         const items = safeItems(pending?.items)
-        const filtered = items.filter((i: any) => i._custom)
-        filtered.push({ product_id: prodId, _custom: true })
-        await supabase.from('telegram_pending_orders').update({ items: filtered, step: 'adding_items' })
+        const existingItem = items.find((i: any) => i.product_id === prodId)
+        if (existingItem) {
+          existingItem._custom = true
+        } else {
+          items.push({ product_id: prodId, _custom: true })
+        }
+        await supabase.from('telegram_pending_orders').update({ items, step: 'adding_items' })
           .eq('telegram_user_id', tgUserId).eq('chat_id', chatId)
         const { data: prod } = await supabase.from('products').select('name, unit').eq('id', prodId).single()
         await tgEditMenu(chatId, messageId,
@@ -482,6 +486,7 @@ export async function POST(req: NextRequest) {
           await supabase.from('telegram_pending_orders').update({ items: newItems }).eq('id', pending.id)
           const { data: prod } = await supabase.from('products').select('name').eq('id', customItem.product_id).single()
           await tgSend(chatId, `${safeHTML(prod?.name || 'Товар')} додано: ${quantity} шт.`)
+          await showOrderSummary(supabase, chatId, messageId, tgUserId)
           return NextResponse.json({ ok: true })
         }
       }

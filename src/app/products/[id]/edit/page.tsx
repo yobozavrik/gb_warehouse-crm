@@ -5,13 +5,14 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { updateProduct, fetchCategoriesTree } from '@/lib/api'
 
+import type { ProductCategory } from '@/lib/types'
+import { ArrowLeft, Save } from 'lucide-react'
+
 function safeNum(v: string | undefined): number | undefined {
   if (!v) return undefined
   const n = Number(v)
   return isFinite(n) ? n : undefined
 }
-import type { ProductCategory } from '@/lib/types'
-import { ArrowLeft, Save } from 'lucide-react'
 
 export default function EditProductPage() {
   const { id } = useParams<{ id: string }>()
@@ -67,8 +68,8 @@ export default function EditProductPage() {
     }
   }
 
-  function Field({ label, value, key: fieldKey, type = 'text', required }: {
-    label: string; value: string; key: string; type?: string; required?: boolean
+  function Field({ label, value, fieldKey, type = 'text', required }: {
+    label: string; value: string; fieldKey: string; type?: string; required?: boolean
   }) {
     return (
       <div>
@@ -114,10 +115,10 @@ export default function EditProductPage() {
       <h1 className="text-2xl font-bold text-gray-900">Редагувати товар</h1>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <Field label="Назва" key="name" value={form.name} required />
+        <Field label="Назва" fieldKey="name" value={form.name} required />
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Артикул" key="sku" value={form.sku} />
-          <Field label="Штрихкод" key="barcode" value={form.barcode} />
+          <Field label="Артикул" fieldKey="sku" value={form.sku} />
+          <Field label="Штрихкод" fieldKey="barcode" value={form.barcode} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Категорія</label>
@@ -131,14 +132,14 @@ export default function EditProductPage() {
           </select>
         </div>
         <div className="grid grid-cols-3 gap-4">
-          <Field label="Одиниця виміру" key="unit" value={form.unit} />
-          <Field label="Ціна закупівлі" key="purchase_price" value={form.purchase_price} type="number" />
-          <Field label="Мін. залишок" key="min_stock" value={form.min_stock} type="number" />
+          <Field label="Одиниця виміру" fieldKey="unit" value={form.unit} />
+          <Field label="Ціна закупівлі" fieldKey="purchase_price" value={form.purchase_price} type="number" />
+          <Field label="Мін. залишок" fieldKey="min_stock" value={form.min_stock} type="number" />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Макс. залишок" key="max_stock" value={form.max_stock} type="number" />
+          <Field label="Макс. залишок" fieldKey="max_stock" value={form.max_stock} type="number" />
         </div>
-        <Field label="Опис" key="description" value={form.description} type="textarea" />
+        <Field label="Опис" fieldKey="description" value={form.description} type="textarea" />
         <button
           type="submit"
           disabled={saving}

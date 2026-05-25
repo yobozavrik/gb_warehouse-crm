@@ -21,13 +21,13 @@ export default function InventoryPage() {
   useEffect(() => { load() }, [])
 
   const handleComplete = async (id: string) => {
-    if (!confirm('Завершить инвентаризацию? Остатки будут скорректированы.')) return
+    if (!confirm('Завершити інвентаризацію? Залишки будуть скориговані.')) return
     try {
       await completeInventory(id)
       load()
     } catch (e) {
       console.error(e)
-      alert('Ошибка')
+      alert('Помилка')
     }
   }
 
@@ -38,10 +38,15 @@ export default function InventoryPage() {
     cancelled: 'bg-red-100 text-red-600',
   }
 
+  const statusLabels: Record<string, string> = {
+    draft: 'Чернетка', in_progress: 'В процесі',
+    completed: 'Завершено', cancelled: 'Скасовано',
+  }
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Инвентаризация</h1>
-      {loading ? <p className="text-gray-500">Загрузка...</p> : (
+      <h1 className="text-2xl font-bold text-gray-900">Інвентаризація</h1>
+      {loading ? <p className="text-gray-500">Завантаження...</p> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500">
@@ -49,7 +54,7 @@ export default function InventoryPage() {
                 <th className="text-left px-4 py-3 font-medium">Номер</th>
                 <th className="text-left px-4 py-3 font-medium">Склад</th>
                 <th className="text-left px-4 py-3 font-medium">Статус</th>
-                <th className="text-right px-4 py-3 font-medium">Создана</th>
+                <th className="text-right px-4 py-3 font-medium">Створена</th>
                 <th className="text-right px-4 py-3 font-medium">Завершена</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -60,10 +65,12 @@ export default function InventoryPage() {
                   <td className="px-4 py-3 font-medium">{i.inventory_number}</td>
                   <td className="px-4 py-3">{i.warehouse?.name}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[i.status]}`}>{i.status}</span>
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[i.status]}`}>
+                      {statusLabels[i.status] || i.status}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-500">{new Date(i.created_at).toLocaleString('ru')}</td>
-                  <td className="px-4 py-3 text-right text-gray-500">{i.completed_at ? new Date(i.completed_at).toLocaleString('ru') : '—'}</td>
+                  <td className="px-4 py-3 text-right text-gray-500">{new Date(i.created_at).toLocaleString('uk-UA')}</td>
+                  <td className="px-4 py-3 text-right text-gray-500">{i.completed_at ? new Date(i.completed_at).toLocaleString('uk-UA') : '—'}</td>
                   <td className="px-4 py-3 text-right">
                     {i.status === 'in_progress' && (
                       <button onClick={() => handleComplete(i.id)} className="text-green-600 hover:text-green-800">
@@ -78,7 +85,7 @@ export default function InventoryPage() {
           {items.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <ClipboardList className="w-12 h-12 mb-2" />
-              <p>Инвентаризаций пока нет</p>
+              <p>Інвентаризацій поки що немає</p>
             </div>
           )}
         </div>

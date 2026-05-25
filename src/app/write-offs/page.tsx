@@ -6,8 +6,8 @@ import { supabase } from '@/lib/supabase'
 import { ClipboardX, CheckCircle } from 'lucide-react'
 
 const reasonLabels: Record<string, string> = {
-  expired: 'Просрочка', damaged: 'Повреждение', lost: 'Потеря',
-  inventory_correction: 'Коррекция', other: 'Другое',
+  expired: 'Прострочення', damaged: 'Пошкодження', lost: 'Втрата',
+  inventory_correction: 'Корекція', other: 'Інше',
 }
 
 export default function WriteOffsPage() {
@@ -26,20 +26,20 @@ export default function WriteOffsPage() {
   useEffect(() => { load() }, [])
 
   const handleConfirm = async (id: string) => {
-    if (!confirm('Подтвердить списание?')) return
+    if (!confirm('Підтвердити списання?')) return
     try {
       await confirmWriteOff(id)
       load()
     } catch (e) {
       console.error(e)
-      alert('Ошибка')
+      alert('Помилка')
     }
   }
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Списание</h1>
-      {loading ? <p className="text-gray-500">Загрузка...</p> : (
+      <h1 className="text-2xl font-bold text-gray-900">Списання</h1>
+      {loading ? <p className="text-gray-500">Завантаження...</p> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500">
@@ -65,7 +65,7 @@ export default function WriteOffsPage() {
                     }`}>{w.status}</span>
                   </td>
                   <td className="px-4 py-3 text-right text-gray-500">
-                    {new Date(w.created_at).toLocaleString('ru')}
+                    {new Date(w.created_at).toLocaleString('uk-UA')}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {w.status === 'draft' && (
@@ -82,7 +82,7 @@ export default function WriteOffsPage() {
           {items.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <ClipboardX className="w-12 h-12 mb-2" />
-              <p>Списаний пока нет</p>
+              <p>Списань поки що немає</p>
             </div>
           )}
         </div>

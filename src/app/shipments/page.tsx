@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { fetchFromTable } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { Truck } from 'lucide-react'
 
@@ -11,6 +10,11 @@ const statusColors: Record<string, string> = {
   shipped: 'bg-green-100 text-green-700',
   delivered: 'bg-emerald-100 text-emerald-700',
   cancelled: 'bg-red-100 text-red-600',
+}
+
+const statusLabels: Record<string, string> = {
+  draft: 'Чернетка', packed: 'Зібрано', shipped: 'Відвантажено',
+  delivered: 'Доставлено', cancelled: 'Скасовано',
 }
 
 export default function ShipmentsPage() {
@@ -27,17 +31,17 @@ export default function ShipmentsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Отгрузки</h1>
-      {loading ? <p className="text-gray-500">Загрузка...</p> : (
+      <h1 className="text-2xl font-bold text-gray-900">Відвантаження</h1>
+      {loading ? <p className="text-gray-500">Завантаження...</p> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Номер</th>
                 <th className="text-left px-4 py-3 font-medium">Магазин</th>
-                <th className="text-left px-4 py-3 font-medium">Со склада</th>
+                <th className="text-left px-4 py-3 font-medium">Зі складу</th>
                 <th className="text-left px-4 py-3 font-medium">Статус</th>
-                <th className="text-right px-4 py-3 font-medium">Отгружено</th>
+                <th className="text-right px-4 py-3 font-medium">Відвантажено</th>
                 <th className="text-right px-4 py-3 font-medium">Доставлено</th>
                 <th className="text-right px-4 py-3 font-medium">Дата</th>
               </tr>
@@ -50,17 +54,17 @@ export default function ShipmentsPage() {
                   <td className="px-4 py-3 text-gray-500">{s.warehouse?.name || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[s.status] || ''}`}>
-                      {s.status}
+                      {statusLabels[s.status] || s.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right text-gray-500">
-                    {s.shipped_at ? new Date(s.shipped_at).toLocaleString('ru') : '—'}
+                    {s.shipped_at ? new Date(s.shipped_at).toLocaleString('uk-UA') : '—'}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-500">
-                    {s.delivered_at ? new Date(s.delivered_at).toLocaleString('ru') : '—'}
+                    {s.delivered_at ? new Date(s.delivered_at).toLocaleString('uk-UA') : '—'}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-500">
-                    {new Date(s.created_at).toLocaleDateString('ru')}
+                    {new Date(s.created_at).toLocaleDateString('uk-UA')}
                   </td>
                 </tr>
               ))}
@@ -69,7 +73,7 @@ export default function ShipmentsPage() {
           {shipments.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <Truck className="w-12 h-12 mb-2" />
-              <p>Отгрузок пока нет</p>
+              <p>Відвантажень поки що немає</p>
             </div>
           )}
         </div>

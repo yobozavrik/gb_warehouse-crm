@@ -53,8 +53,6 @@ export default function ReceiptsPage() {
     || (r.supplier?.name && r.supplier.name.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const totalAmount = filtered.reduce((acc, r) => acc + (r._total || 0), 0)
-
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -125,7 +123,7 @@ export default function ReceiptsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-13 sm:ml-0">
+                  <div className="flex items-center gap-3 shrink-0 ml-12 sm:ml-0">
                     <div className="text-right">
                       <div className="text-sm font-semibold text-[var(--color-text)]">{formatDate(r.created_at)}</div>
                     </div>

@@ -1,5 +1,5 @@
 // ============================================================================
-// TypeScript С‚РёРїС‹ РґР»СЏ warehouse-crm
+// TypeScript типи для warehouse-crm
 // ============================================================================
 
 export interface ProductCategory {
@@ -95,7 +95,10 @@ export interface Product {
 export interface Warehouse {
   id: number
   name: string
-  type: 'central' | 'shop' | 'transit'
+  type: string
+  warehouse_type: 'shop' | 'workshop' | 'storage' | 'other' | null
+  parent_shop_id: number | null
+  poster_storage_id: number | null
   address: string | null
   is_active: boolean
 }

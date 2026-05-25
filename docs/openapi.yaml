@@ -1,0 +1,1500 @@
+openapi: "3.0.3"
+info:
+  title: Warehouse CRM API — Складський облік (Галя Балувана)
+  description: |
+    API для управління складом побутової хімії. Всі операції виконуються
+    через Supabase RPC (PostgreSQL функції). Фронтенд (Next.js) використовує
+    Supabase SDK для виклику RPC. Telegram webhook — єдиний публічний ендпоінт.
+
+    ## Authentication
+    - **anon key** (фронтенд): `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...`
+    - **service_role key** (Telegram webhook): `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...`
+    - **Telegram webhook secret token**: `63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c`
+
+    ## Schema
+    Всі таблиці та RPC знаходяться в схемі `household_chemicals`.
+    Supabase SDK передає заголовок `Accept-Profile: household_chemicals`.
+  version: "1.0.0"
+  contact:
+    name: Dmytro Tovstytskyi
+  x-database-schema: household_chemicals
+
+servers:
+  - url: https://supabase.dmytrotovstytskyi.online/rest/v1
+    description: Supabase REST API (direct table access)
+  - url: https://supabase.dmytrotovstytskyi.online/rest/v1/rpc
+    description: Supabase RPC endpoint
+  - url: http://localhost:3001
+    description: Local Next.js dev server
+
+paths:
+  # ===========================================================================
+  # TELEGRAM WEBHOOK
+  # ===========================================================================
+  /api/telegram/webhook:
+    post:
+      summary: Telegram Bot Webhook
+      description: |
+        Обробник вхідних повідомлень від Telegram Bot API.
+        Підтримує команди: /start, /help, /order, /catalog, /status, /cancel,
+        /myshop, /whoami, /setup, та inline keyboard callback'и.
+      operationId: telegramWebhook
+      security:
+        - TelegramSecretToken: []
+      parameters:
+        - name: X-Telegram-Bot-Api-Secret-Token
+          in: header
+          required: true
+          schema:
+            type: string
+            example: 63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c
+          description: Секретний токен для верифікації Telegram webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Update object від Telegram Bot API
+      responses:
+        "200":
+          description: OK (порожня відповідь, Telegram ігнорує тіло)
+        "403":
+          description: Forbidden — невірний secret_token
+
+  # ===========================================================================
+  # READ-ONLY RPCs (доступні anon + authenticated)
+  # ===========================================================================
+  /rpc/rpc_dashboard_summary:
+    post:
+      summary: Dashboard Summary
+      description: |
+        Повна статистика для дашборду: кількість товарів, критичний запас,
+        вартість, незакриті заявки, останні рухи.
+      operationId: rpc_dashboard_summary
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_warehouse_id:
+                  type: integer
+                  nullable: true
+                  description: ID складу (null = всі)
+      responses:
+        "200":
+          description: DashboardSummary JSONB
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+                    properties:
+                      products_in_stock:
+                        type: integer
+                      products_out_of_stock:
+                        type: integer
+                      critical_items:
+                        type: integer
+                      stock_value:
+                        type: number
+                      pending_orders:
+                        type: integer
+                      shipments_today:
+                        type: integer
+                      draft_receipts:
+                        type: integer
+                      active_warehouses:
+                        type: integer
+                  critical_items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product_id: { type: integer }
+                        product_name: { type: string }
+                        warehouse_id: { type: integer }
+                        warehouse_name: { type: string }
+                        quantity: { type: number }
+                        min_stock: { type: number }
+                        deficit: { type: number }
+                  recent_movements:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        product_name: { type: string }
+                        warehouse_name: { type: string }
+                        quantity_change: { type: number }
+                        movement_type: { type: string }
+                        created_at: { type: string, format: date-time }
+                  pending_orders:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        order_number: { type: string }
+                        shop_name: { type: string }
+                        status: { type: string }
+                        items_count: { type: integer }
+                        total_requested: { type: number }
+                        created_at: { type: string, format: date-time }
+
+  /rpc/rpc_product_catalog:
+    post:
+      summary: Product Catalog
+      description: Каталог товарів з залишками та пагінацією
+      operationId: rpc_product_catalog
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_category_id:
+                  type: integer
+                  nullable: true
+                p_search:
+                  type: string
+                  nullable: true
+                p_warehouse_id:
+                  type: integer
+                  nullable: true
+                p_page:
+                  type: integer
+                  default: 1
+                p_page_size:
+                  type: integer
+                  default: 100
+      responses:
+        "200":
+          description: PaginatedResponse з товарами
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product_id: { type: integer }
+                        product_name: { type: string }
+                        sku: { type: string, nullable: true }
+                        barcode: { type: string, nullable: true }
+                        unit: { type: string }
+                        category_id: { type: integer, nullable: true }
+                        category_name: { type: string, nullable: true }
+                        purchase_price: { type: number, nullable: true }
+                        min_stock: { type: number, nullable: true }
+                        max_stock: { type: number, nullable: true }
+                        stock:
+                          oneOf:
+                            - type: number
+                            - type: object
+                              additionalProperties:
+                                type: number
+                        total_stock: { type: number }
+                  total: { type: integer }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  total_pages: { type: integer }
+
+  /rpc/rpc_categories_tree:
+    post:
+      summary: Categories Tree
+      description: Ієрархічний список категорій товарів
+      operationId: rpc_categories_tree
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Масив категорій з рівнем вкладеності
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: integer }
+                    name: { type: string }
+                    level: { type: integer }
+
+  /rpc/rpc_categories_with_products:
+    post:
+      summary: Categories with Products
+      description: Категорії згруповані з товарами та залишками
+      operationId: rpc_categories_with_products
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_search:
+                  type: string
+                  nullable: true
+                p_category_id:
+                  type: integer
+                  nullable: true
+      responses:
+        "200":
+          description: Об'єкт з категоріями та товарами
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        description: { type: string, nullable: true }
+                        product_count: { type: integer }
+                        products:
+                          type: array
+                          items:
+                            $ref: "#/components/schemas/ProductCard"
+
+  /rpc/rpc_product_detail:
+    post:
+      summary: Product Detail
+      description: Детальна інформація про товар — залишки, накладні, ціни, постачальник
+      operationId: rpc_product_detail
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_product_id
+              properties:
+                p_product_id:
+                  type: integer
+      responses:
+        "200":
+          description: ProductDetail JSONB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDetail"
+
+  /rpc/rpc_suppliers_with_stats:
+    post:
+      summary: Suppliers with Stats
+      description: Список постачальників зі статистикою поставок та платежів
+      operationId: rpc_suppliers_with_stats
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Масив SupplierWithStats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupplierWithStats"
+
+  /rpc/rpc_supplier_detail:
+    post:
+      summary: Supplier Detail
+      description: Деталі постачальника — інфо, всі накладні з товарами, платежі, статистика
+      operationId: rpc_supplier_detail
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_supplier_id
+              properties:
+                p_supplier_id:
+                  type: integer
+      responses:
+        "200":
+          description: SupplierDetail JSONB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierDetail"
+
+  /rpc/rpc_categories_with_suppliers:
+    post:
+      summary: Categories with Suppliers
+      description: Категорії з масивом постачальників, які постачають товари в цій категорії
+      operationId: rpc_categories_with_suppliers
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Категорії з постачальниками
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryWithSuppliers"
+
+  /rpc/rpc_warehouses_with_stats:
+    post:
+      summary: Warehouses with Stats
+      description: Склади зі статистикою залишків та активності
+      operationId: rpc_warehouses_with_stats
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_days:
+                  type: integer
+                  default: 30
+      responses:
+        "200":
+          description: Масив складів зі статистикою
+
+  /rpc/rpc_shops_with_stats:
+    post:
+      summary: Shops with Stats
+      description: Магазини зі статистикою активності та залишків
+      operationId: rpc_shops_with_stats
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_days:
+                  type: integer
+                  default: 30
+      responses:
+        "200":
+          description: Масив магазинів зі статистикою
+
+  /rpc/rpc_warehouse_directory:
+    post:
+      summary: Warehouse Directory
+      description: Довідник складів з типами та прив'язкою до магазинів
+      operationId: rpc_warehouse_directory
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Масив складів
+
+  /rpc/rpc_orders_list:
+    post:
+      summary: Orders List
+      description: Список заявок з фільтрацією та пагінацією
+      operationId: rpc_orders_list
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_status:
+                  type: string
+                  nullable: true
+                p_warehouse_id:
+                  type: integer
+                  nullable: true
+                p_shop_id:
+                  type: integer
+                  nullable: true
+                p_source:
+                  type: string
+                  nullable: true
+                p_date_from:
+                  type: string
+                  format: date
+                  nullable: true
+                p_date_to:
+                  type: string
+                  format: date
+                  nullable: true
+                p_page:
+                  type: integer
+                  default: 1
+                p_page_size:
+                  type: integer
+                  default: 50
+      responses:
+        "200":
+          description: PaginatedResponse з заявками
+
+  /rpc/rpc_order_detail:
+    post:
+      summary: Order Detail
+      description: Деталі заявки з товарами та відвантаженнями
+      operationId: rpc_order_detail
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_order_id
+              properties:
+                p_order_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: OrderDetail JSONB
+
+  /rpc/rpc_stock_movements_list:
+    post:
+      summary: Stock Movements List
+      description: Журнал рухів товарів з фільтрацією та пагінацією
+      operationId: rpc_stock_movements_list
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_product_id:
+                  type: integer
+                  nullable: true
+                p_warehouse_id:
+                  type: integer
+                  nullable: true
+                p_movement_type:
+                  type: string
+                  nullable: true
+                p_date_from:
+                  type: string
+                  format: date
+                  nullable: true
+                p_date_to:
+                  type: string
+                  format: date
+                  nullable: true
+                p_page:
+                  type: integer
+                  default: 1
+                p_page_size:
+                  type: integer
+                  default: 50
+      responses:
+        "200":
+          description: PaginatedResponse з рухами
+
+  # ===========================================================================
+  # BUSINESS LOGIC RPCs (authenticated / service_role only)
+  # ===========================================================================
+  /rpc/confirm_receipt:
+    post:
+      summary: Confirm Receipt
+      description: Проведення прибуткової накладної — оновлює залишки
+      operationId: confirm_receipt
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_receipt_id
+              properties:
+                p_receipt_id:
+                  type: string
+                  format: uuid
+                p_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "200":
+          description: void
+
+  /rpc/ship_order:
+    post:
+      summary: Ship Order
+      description: Створення відвантаження за заявкою, списання зі складу
+      operationId: ship_order
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_order_id
+              properties:
+                p_order_id:
+                  type: string
+                  format: uuid
+                p_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "200":
+          description: UUID створеної відвантаження
+
+  /rpc/confirm_transfer:
+    post:
+      summary: Confirm Transfer
+      description: Проведення переміщення між складами
+      operationId: confirm_transfer
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_transfer_id
+              properties:
+                p_transfer_id:
+                  type: string
+                  format: uuid
+                p_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "200":
+          description: void
+
+  /rpc/confirm_write_off:
+    post:
+      summary: Confirm Write-Off
+      description: Проведення списання товарів
+      operationId: confirm_write_off
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_write_off_id
+              properties:
+                p_write_off_id:
+                  type: string
+                  format: uuid
+                p_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "200":
+          description: void
+
+  /rpc/complete_inventory:
+    post:
+      summary: Complete Inventory
+      description: Завершення інвентаризації з корекцією залишків
+      operationId: complete_inventory
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_inventory_id
+              properties:
+                p_inventory_id:
+                  type: string
+                  format: uuid
+                p_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "200":
+          description: void
+
+  /rpc/set_initial_stock:
+    post:
+      summary: Set Initial Stock
+      description: Встановлення початкових залишків товару на складі
+      operationId: set_initial_stock
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_product_id
+                - p_warehouse_id
+                - p_quantity
+              properties:
+                p_product_id:
+                  type: integer
+                p_warehouse_id:
+                  type: integer
+                p_quantity:
+                  type: number
+                p_user_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        "200":
+          description: void
+
+  # ===========================================================================
+  # TELEGRAM RPCs (service_role only)
+  # ===========================================================================
+  /rpc/telegram_get_or_create_user:
+    post:
+      summary: Telegram Get or Create User
+      description: Реєстрація або отримання користувача Telegram
+      operationId: telegram_get_or_create_user
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_user_id
+              properties:
+                p_user_id:
+                  type: integer
+                  format: int64
+                  description: Telegram user_id
+                p_username:
+                  type: string
+                  nullable: true
+                p_first_name:
+                  type: string
+                  nullable: true
+                p_last_name:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: JSONB (було table row, змінено в #016)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  user_id: { type: integer, format: int64 }
+                  username: { type: string, nullable: true }
+                  first_name: { type: string, nullable: true }
+                  last_name: { type: string, nullable: true }
+                  display_name: { type: string, nullable: true }
+                  phone: { type: string, nullable: true }
+                  shop_id: { type: integer, nullable: true }
+                  household_user_id: { type: string, format: uuid, nullable: true }
+                  is_active: { type: boolean }
+                  last_interaction_at: { type: string, format: date-time, nullable: true }
+
+  /rpc/telegram_log_message:
+    post:
+      summary: Telegram Log Message
+      description: Логування повідомлення Telegram
+      operationId: telegram_log_message
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_telegram_user_id
+                - p_chat_id
+                - p_message_id
+                - p_message_type
+              properties:
+                p_telegram_user_id:
+                  type: integer
+                p_chat_id:
+                  type: integer
+                  format: int64
+                p_message_id:
+                  type: integer
+                p_message_type:
+                  type: string
+                p_text_content:
+                  type: string
+                  nullable: true
+                p_parsed_command:
+                  type: string
+                  nullable: true
+                p_parsed_data:
+                  type: object
+                  nullable: true
+                p_processing_time_ms:
+                  type: integer
+                  nullable: true
+                p_error:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: UUID логу
+
+  /rpc/telegram_create_order:
+    post:
+      summary: Telegram Create Order
+      description: Створення заявки з Telegram (з валідацією товарів)
+      operationId: telegram_create_order
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_telegram_user_id
+                - p_shop_id
+              properties:
+                p_telegram_user_id:
+                  type: integer
+                p_shop_id:
+                  type: integer
+                p_warehouse_id:
+                  type: integer
+                  default: 1
+                p_items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      product_id:
+                        type: integer
+                      quantity:
+                        type: number
+                  default: []
+                p_notes:
+                  type: string
+                  nullable: true
+                p_telegram_message_id:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: |
+            JSONB:
+            - success: boolean
+            - order_id: uuid
+            - order_number: string
+            - items_created: int
+            - errors: array
+
+  /rpc/telegram_check_order_status:
+    post:
+      summary: Telegram Check Order Status
+      description: Перевірка статусу заявки за номером
+      operationId: telegram_check_order_status
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_order_number
+              properties:
+                p_order_number:
+                  type: string
+      responses:
+        "200":
+          description: Order status JSONB
+
+  /rpc/telegram_get_catalog_text:
+    post:
+      summary: Telegram Get Catalog Text
+      description: Текстове представлення каталогу для Telegram
+      operationId: telegram_get_catalog_text
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_category_id:
+                  type: integer
+                  nullable: true
+                p_warehouse_id:
+                  type: integer
+                  default: 1
+                p_search:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: TEXT
+
+  # ===========================================================================
+  # DIRECT TABLE ACCESS
+  # ===========================================================================
+  /products:
+    get:
+      summary: Get Products
+      description: Прямий доступ до таблиці products
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Масив продуктів
+    post:
+      summary: Create Product
+      description: Створення нового товару
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Product"
+      responses:
+        "201":
+          description: Створений продукт
+
+  /suppliers:
+    get:
+      summary: Get Suppliers
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Масив постачальників
+
+  /warehouses:
+    get:
+      summary: Get Warehouses
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Масив складів
+
+  /shops:
+    get:
+      summary: Get Shops
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Масив магазинів
+
+  /receipts:
+    get:
+      summary: Get Receipts
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Масив накладних
+    post:
+      summary: Create Receipt
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                receipt_number:
+                  type: string
+                supplier_id:
+                  type: integer
+                  nullable: true
+                warehouse_id:
+                  type: integer
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Створена накладна
+
+  /receipt_items:
+    get:
+      summary: Get Receipt Items
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+        - name: receipt_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Масив рядків накладної
+
+  /stock_balances:
+    get:
+      summary: Get Stock Balances
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+        - name: warehouse_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Масив залишків
+
+  /supplier_payments:
+    get:
+      summary: Get Supplier Payments
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+        - name: supplier_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Масив платежів
+    post:
+      summary: Create Supplier Payment
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                supplier_id:
+                  type: integer
+                amount:
+                  type: number
+                payment_date:
+                  type: string
+                  format: date
+                payment_method:
+                  type: string
+                  nullable: true
+                reference_number:
+                  type: string
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Створений платіж
+
+  /v_stock_summary:
+    get:
+      summary: Stock Summary View
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Зведення залишків
+
+  /v_critical_stock:
+    get:
+      summary: Critical Stock View
+      parameters:
+        - name: Accept-Profile
+          in: header
+          required: true
+          schema:
+            type: string
+            default: household_chemicals
+      responses:
+        "200":
+          description: Критичні запаси
+
+components:
+  securitySchemes:
+    TelegramSecretToken:
+      type: apiKey
+in: header
+            name: X-Telegram-Bot-Api-Secret-Token
+          description: Секретний токен для верифікації Telegram webhook (64 символи hex)
+      x-security:
+        - Secret token check: 403 Forbidden if invalid
+        - Rate limiting: 500ms per user_id
+        - Input sanitization: safeHTML(), safeInt(), safeQuantity(), safeNum()
+        - Regex validation: phone, order numbers
+        - Logging: every message to telegram_messages_log
+    SupabaseAnonKey:
+      type: apiKey
+      in: header
+      name: apikey
+      description: Supabase anon key для публічного доступу
+    SupabaseServiceRole:
+      type: apiKey
+      in: header
+      name: apikey
+      description: Supabase service_role key для привілейованого доступу
+
+  schemas:
+    Product:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        sku: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        category_id: { type: integer, nullable: true }
+        unit: { type: string }
+        purchase_price: { type: number, nullable: true, format: double }
+        min_stock: { type: number, nullable: true, format: double }
+        max_stock: { type: number, nullable: true, format: double }
+        description: { type: string, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProductCard:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        sku: { type: string, nullable: true }
+        unit: { type: string }
+        purchase_price: { type: number, nullable: true }
+        description: { type: string, nullable: true }
+        total_stock: { type: number }
+        min_stock: { type: number, nullable: true }
+        supplier:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            name: { type: string }
+
+    ProductDetail:
+      type: object
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        stock:
+          type: array
+          items:
+            type: object
+            properties:
+              warehouse_id: { type: integer }
+              warehouse_name: { type: string }
+              quantity: { type: number }
+        receipts:
+          type: array
+          items:
+            type: object
+            properties:
+              receipt_id: { type: string, format: uuid }
+              receipt_number: { type: string }
+              receipt_date: { type: string, format: date-time }
+              supplier_id: { type: integer, nullable: true }
+              supplier_name: { type: string, nullable: true }
+              warehouse_id: { type: integer }
+              warehouse_name: { type: string }
+              quantity: { type: number }
+              price: { type: number, nullable: true }
+              total: { type: number, nullable: true }
+        price_history:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              price: { type: number }
+              receipt_number: { type: string }
+              supplier_name: { type: string, nullable: true }
+        supplier:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            contact_person: { type: string, nullable: true }
+            phone: { type: string, nullable: true }
+            email: { type: string, nullable: true }
+            edrpou: { type: string, nullable: true }
+            category: { type: string, nullable: true }
+
+    Supplier:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        contact_person: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        edrpou: { type: string, nullable: true }
+        payment_days: { type: integer, nullable: true }
+        category: { type: string, nullable: true }
+        website: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        is_active: { type: boolean }
+
+    SupplierWithStats:
+      allOf:
+        - $ref: "#/components/schemas/Supplier"
+        - type: object
+          properties:
+            total_receipts: { type: integer }
+            total_products_supplied: { type: integer }
+            total_amount: { type: number }
+            receipts_30d: { type: integer }
+            last_receipt_date: { type: string, format: date, nullable: true }
+            first_receipt_date: { type: string, format: date, nullable: true }
+            total_paid: { type: number }
+            total_debt: { type: number }
+            payment_count: { type: integer }
+            last_payment_date: { type: string, format: date, nullable: true }
+            payment_percent: { type: number }
+
+    SupplierDetail:
+      type: object
+      properties:
+        supplier:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            contact_person: { type: string, nullable: true }
+            phone: { type: string, nullable: true }
+            email: { type: string, nullable: true }
+            edrpou: { type: string, nullable: true }
+            category: { type: string, nullable: true }
+            website: { type: string, nullable: true }
+            payment_days: { type: integer, nullable: true }
+            notes: { type: string, nullable: true }
+            created_at: { type: string, format: date-time }
+        receipts:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              receipt_number: { type: string }
+              confirmed_at: { type: string, format: date-time }
+              warehouse_name: { type: string }
+              items_count: { type: integer }
+              total_amount: { type: number }
+              items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    product_id: { type: integer }
+                    product_name: { type: string }
+                    sku: { type: string, nullable: true }
+                    quantity: { type: number }
+                    price: { type: number, nullable: true }
+                    total: { type: number, nullable: true }
+        payments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              amount: { type: number }
+              payment_date: { type: string, format: date }
+              payment_method: { type: string, nullable: true }
+              reference_number: { type: string, nullable: true }
+              notes: { type: string, nullable: true }
+        stats:
+          type: object
+          properties:
+            total_receipts: { type: integer }
+            total_items: { type: integer }
+            total_amount: { type: number }
+            total_paid: { type: number }
+            total_debt: { type: number }
+            first_receipt_date: { type: string, format: date, nullable: true }
+            last_receipt_date: { type: string, format: date, nullable: true }
+            payment_count: { type: integer }
+            last_payment_date: { type: string, format: date, nullable: true }
+
+    CategoryWithSuppliers:
+      type: object
+      properties:
+        category_id: { type: integer }
+        category_name: { type: string }
+        supplier_count: { type: integer }
+        suppliers:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              total_receipts: { type: integer }
+              total_amount: { type: number }
+              total_products: { type: integer }
+
+    SupplierPayment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        supplier_id: { type: integer }
+        amount: { type: number }
+        payment_date: { type: string, format: date }
+        payment_method: { type: string, nullable: true }
+        reference_number: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    PaginatedResponse:
+      type: object
+      properties:
+        items:
+          type: array
+        total: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+        total_pages: { type: integer }

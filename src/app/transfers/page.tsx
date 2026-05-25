@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { confirmTransfer, fetchFromTable } from '@/lib/api'
+import { confirmTransfer } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { MoveRight, CheckCircle } from 'lucide-react'
 
@@ -10,6 +10,11 @@ const statusColors: Record<string, string> = {
   confirmed: 'bg-blue-100 text-blue-700',
   completed: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-600',
+}
+
+const statusLabels: Record<string, string> = {
+  draft: 'Чернетка', confirmed: 'Підтверджено',
+  completed: 'Виконано', cancelled: 'Скасовано',
 }
 
 export default function TransfersPage() {
@@ -28,27 +33,27 @@ export default function TransfersPage() {
   useEffect(() => { load() }, [])
 
   const handleConfirm = async (id: string) => {
-    if (!confirm('Провести перемещение?')) return
+    if (!confirm('Провести переміщення?')) return
     try {
       await confirmTransfer(id)
       load()
     } catch (e) {
       console.error(e)
-      alert('Ошибка')
+      alert('Помилка')
     }
   }
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Перемещения</h1>
-      {loading ? <p className="text-gray-500">Загрузка...</p> : (
+      <h1 className="text-2xl font-bold text-gray-900">Переміщення</h1>
+      {loading ? <p className="text-gray-500">Завантаження...</p> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Номер</th>
-                <th className="text-left px-4 py-3 font-medium">Откуда</th>
-                <th className="text-left px-4 py-3 font-medium">Куда</th>
+                <th className="text-left px-4 py-3 font-medium">Звідки</th>
+                <th className="text-left px-4 py-3 font-medium">Куди</th>
                 <th className="text-left px-4 py-3 font-medium">Статус</th>
                 <th className="text-right px-4 py-3 font-medium">Дата</th>
                 <th className="px-4 py-3"></th>
@@ -62,11 +67,11 @@ export default function TransfersPage() {
                   <td className="px-4 py-3">{t.to_warehouse?.name}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[t.status] || ''}`}>
-                      {t.status}
+                      {statusLabels[t.status] || t.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right text-gray-500">
-                    {new Date(t.created_at).toLocaleString('ru')}
+                    {new Date(t.created_at).toLocaleString('uk-UA')}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {t.status === 'draft' && (
@@ -84,7 +89,7 @@ export default function TransfersPage() {
           {transfers.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <MoveRight className="w-12 h-12 mb-2" />
-              <p>Перемещений пока нет</p>
+              <p>Переміщень поки що немає</p>
             </div>
           )}
         </div>

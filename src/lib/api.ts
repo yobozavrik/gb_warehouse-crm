@@ -39,7 +39,7 @@ export async function createProduct(product: {
 }): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
-    .insert([{ ...product, unit: product.unit ?? 'С€С‚' }])
+    .insert([{ ...product, unit: product.unit ?? 'шт' }])
     .select()
     .single()
   if (error) throw error

@@ -46,7 +46,7 @@ export default function ShopsPage() {
   useEffect(() => { load(days) }, [days])
 
   const formatCurrency = (v: number) =>
-    new Intl.NumberFormat('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 }).format(v)
+    new Intl.NumberFormat('uk-UA', { style: 'decimal', maximumFractionDigits: 0 }).format(v) + ' ₴'
 
   const daysAgo = (d: string | null) => {
     if (!d) return '—'

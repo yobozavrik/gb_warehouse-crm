@@ -30,7 +30,7 @@ export default function SupplierDetailPage() {
   const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!id) return
+    if (!id) { setLoading(false); setError('Невалідний ID'); return }
     fetchSupplierDetail(Number(id))
       .then(setDetail)
       .catch(e => setError(e.message))
