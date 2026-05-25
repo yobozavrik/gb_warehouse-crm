@@ -76,7 +76,7 @@
 - Suppliers grouped by **product categories** based on delivered products
 - `Intl.NumberFormat` must use `style: 'decimal'` + manual currency suffix to avoid hydration mismatch
 - Migration #007 superseded by #009 — DO NOT apply (renamed to `007_SUPERSEDED_product_detail_rpc.sql`)
-- Migration files exist in THREE places: `warehouse-crm/`, `supabase/migrations/household/`, `supabase/migrations/`
+- Migration files exist in `supabase/migrations/` (основне місце для Supabase Studio)
 
 ## Next Steps
 1. **Заповнити `parent_shop_id`** для цехів 25-38 (UPDATE запитом)
