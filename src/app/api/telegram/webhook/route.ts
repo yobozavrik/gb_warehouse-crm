@@ -241,12 +241,18 @@ export async function POST(req: NextRequest) {
       }
       if (data.startsWith('order:shop:')) {
         const shopId = parseInt(data.split(':')[2])
-        // Create or update pending order
         await supabase.from('telegram_pending_orders').upsert({
           telegram_user_id: tgUserId, chat_id: chatId, step: 'selecting_shop',
           shop_id: shopId, items: [],
         }, { onConflict: 'telegram_user_id, chat_id', ignoreDuplicates: false })
         await showCategories(supabase, chatId, messageId, 'order')
+        return NextResponse.json({ ok: true })
+      }
+      if (data.startsWith('shopset:')) {
+        const shopId = parseInt(data.split(':')[1])
+        await supabase.from('telegram_users').update({ shop_id: shopId }).eq('id', tgUserId)
+        const { data: shop } = await supabase.from('shops').select('name').eq('id', shopId).single()
+        await tgEditMenu(chatId, messageId, `✅ Ваш магазин: <b>${shop?.name || '?'}</b>\n\nТепер /order одразу створює замовлення для цього магазину.`, [])
         return NextResponse.json({ ok: true })
       }
       if (data.startsWith('order:cat:')) {
@@ -389,6 +395,8 @@ export async function POST(req: NextRequest) {
           + '/catalog — переглянути каталог товарів\n'
           + '/order — зробити замовлення\n'
           + '/status — перевірити статус замовлення\n'
+          + '/myshop — вказати ваш магазин\n'
+          + '/whoami — мої дані\n'
           + '/cancel — скасувати поточне замовлення\n'
           + '/help — довідка',
           'HTML'
@@ -401,6 +409,8 @@ export async function POST(req: NextRequest) {
           + '/catalog — переглянути каталог товарів (вибір категорії)\n'
           + '/order — створити замовлення\n'
           + '/status <номер_заявки> — перевірити статус\n'
+          + '/myshop — вказати ваш магазин\n'
+          + '/whoami — мої дані\n'
           + '/cancel — скасувати поточне замовлення\n'
           + '/start — вітальне повідомлення\n\n'
           + '<i>Під час замовлення просто вводьте кількість товару</i>',
@@ -413,7 +423,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
       if (text === '/order') {
-        await showShopSelection(supabase, chatId, messageId)
+        if ((tgUser as any).shop_id) {
+          await supabase.from('telegram_pending_orders').upsert({
+            telegram_user_id: tgUserId, chat_id: chatId, step: 'selecting_shop',
+            shop_id: (tgUser as any).shop_id, items: [],
+          }, { onConflict: 'telegram_user_id, chat_id', ignoreDuplicates: false })
+          await showCategories(supabase, chatId, messageId, 'order')
+        } else {
+          await showShopSelection(supabase, chatId, messageId)
+        }
         return NextResponse.json({ ok: true })
       }
       if (text === '/cancel') {
@@ -425,6 +443,42 @@ export async function POST(req: NextRequest) {
         } else {
           await tgSend(chatId, 'Немає активного замовлення.')
         }
+        return NextResponse.json({ ok: true })
+      }
+      if (text === '/myshop') {
+        const { data: shopsRaw } = await supabase.rpc('rpc_shops_with_stats', { p_days: 365 })
+        const shops = (shopsRaw as any[]) || []
+        const currentShopId = (tgUser as any).shop_id
+        const { data: curShop } = currentShopId
+          ? await supabase.from('shops').select('name').eq('id', currentShopId).single()
+          : { data: null }
+
+        let msg = '🏪 <b>Налаштування магазину</b>\n\n'
+        if (curShop) msg += `Ваш поточний магазин: <b>${curShop.name}</b>\n\n`
+        else msg += 'У вас не встановлено магазин.\n\n'
+        msg += 'Оберіть ваш магазин:'
+
+        const buttons = shops.map(s => [{
+          text: `${currentShopId === s.id ? '✅ ' : ''}${s.name}`,
+          callback_data: `shopset:${s.id}`,
+        }])
+        await tgSendMenu(chatId, msg, buttons)
+        return NextResponse.json({ ok: true })
+      }
+      if (text === '/whoami') {
+        const shopName = (tgUser as any).shop_id
+          ? (await supabase.from('shops').select('name').eq('id', (tgUser as any).shop_id).single()).data?.name
+          : 'не встановлено'
+        await tgSend(chatId,
+          `<b>Ваші дані:</b>\n\n`
+          + `ID в Telegram: <code>${userId}</code>\n`
+          + `ID в системі: <code>${tgUserId}</code>\n`
+          + `Ім\'я: ${firstName || ''} ${lastName || ''}\n`
+          + `Логін: @${userName || '—'}\n`
+          + `Магазин: <b>${shopName}</b>\n\n`
+          + `/myshop — змінити магазин`,
+          'HTML'
+        )
         return NextResponse.json({ ok: true })
       }
       if (text.startsWith('/status ')) {
