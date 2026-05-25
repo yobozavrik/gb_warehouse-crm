@@ -20,17 +20,18 @@ function formatCurrency(n: number | null) {
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const productId = isFinite(Number(id)) ? Number(id) : 0
   const [detail, setDetail] = useState<ProductDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!id) return
-    fetchProductDetail(Number(id))
+    if (!productId) return
+    fetchProductDetail(productId)
       .then(setDetail)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [productId])
 
   if (loading) return (
     <div className="space-y-5 animate-pulse">

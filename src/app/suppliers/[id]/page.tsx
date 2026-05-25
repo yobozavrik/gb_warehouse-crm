@@ -80,7 +80,7 @@ export default function SupplierDetailPage() {
                 </a>
               )}
               {supplier.website && (
-                <a href={supplier.website} target="_blank" className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-brand-600)] transition-colors">
+                <a href={supplier.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-brand-600)] transition-colors">
                   <Globe className="w-3.5 h-3.5" /> Сайт
                 </a>
               )}

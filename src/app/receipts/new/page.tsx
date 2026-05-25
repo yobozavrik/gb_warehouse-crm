@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createReceipt, fetchWarehouses, fetchSuppliers } from '@/lib/api'
+
+function safeNum(v: string): number {
+  const n = Number(v)
+  return isFinite(n) ? n : 0
+}
 import { supabase } from '@/lib/supabase'
 import type { Warehouse, Supplier, Product } from '@/lib/types'
 import { ArrowLeft, Plus, Trash2, Save, Search } from 'lucide-react'
@@ -190,7 +195,7 @@ export default function NewReceiptPage() {
                       value={line.quantity}
                       onChange={e => {
                         const newLines = [...lines]
-                        newLines[idx].quantity = Number(e.target.value)
+                        newLines[idx].quantity = safeNum(e.target.value)
                         setLines(newLines)
                       }}
                     />
@@ -201,7 +206,7 @@ export default function NewReceiptPage() {
                       value={line.price}
                       onChange={e => {
                         const newLines = [...lines]
-                        newLines[idx].price = Number(e.target.value)
+                        newLines[idx].price = safeNum(e.target.value)
                         setLines(newLines)
                       }}
                     />

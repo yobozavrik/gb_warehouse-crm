@@ -21,7 +21,7 @@ function getServiceKey(): string {
   if (typeof process !== 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return process.env.SUPABASE_SERVICE_ROLE_KEY
   }
-  return 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2MzI0OTcwMCwiZXhwIjo0OTE4OTIzMzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.QC9C9-CxocHb-jM-lHmXHEjEZV2hCOaSwgfxKLjKoEQ'
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set')
 }
 
 export function getSupabase(): SupabaseClient {

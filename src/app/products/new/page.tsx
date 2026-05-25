@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProduct, fetchCategoriesTree, fetchWarehouses, fetchStockBalances, fetchFromTable } from '@/lib/api'
 import type { ProductCategory } from '@/lib/types'
+
+function safeNum(v: string | undefined): number | undefined {
+  if (!v) return undefined
+  const n = Number(v)
+  return isFinite(n) ? n : undefined
+}
 import { ArrowLeft, Save } from 'lucide-react'
 import Link from 'next/link'
 
@@ -30,10 +36,10 @@ export default function NewProductPage() {
         name: form.name,
         sku: form.sku || undefined,
         barcode: form.barcode || undefined,
-        category_id: form.category_id ? Number(form.category_id) : undefined,
+        category_id: safeNum(form.category_id),
         unit: form.unit,
-        purchase_price: form.purchase_price ? Number(form.purchase_price) : undefined,
-        min_stock: form.min_stock ? Number(form.min_stock) : undefined,
+        purchase_price: safeNum(form.purchase_price),
+        min_stock: safeNum(form.min_stock),
         max_stock: form.max_stock ? Number(form.max_stock) : undefined,
         description: form.description || undefined,
       })

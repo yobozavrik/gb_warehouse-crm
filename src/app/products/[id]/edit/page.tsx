@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { updateProduct, fetchCategoriesTree } from '@/lib/api'
+
+function safeNum(v: string | undefined): number | undefined {
+  if (!v) return undefined
+  const n = Number(v)
+  return isFinite(n) ? n : undefined
+}
 import type { ProductCategory } from '@/lib/types'
 import { ArrowLeft, Save } from 'lucide-react'
 
@@ -48,11 +54,11 @@ export default function EditProductPage() {
         name: form.name,
         sku: form.sku || undefined,
         barcode: form.barcode || undefined,
-        category_id: form.category_id ? Number(form.category_id) : undefined,
+        category_id: safeNum(form.category_id),
         unit: form.unit,
-        purchase_price: form.purchase_price ? Number(form.purchase_price) : undefined,
-        min_stock: form.min_stock ? Number(form.min_stock) : undefined,
-        max_stock: form.max_stock ? Number(form.max_stock) : undefined,
+        purchase_price: safeNum(form.purchase_price),
+        min_stock: safeNum(form.min_stock),
+        max_stock: safeNum(form.max_stock),
         description: form.description || undefined,
       })
       router.push(`/products/${id}`)
