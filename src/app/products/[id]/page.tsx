@@ -138,7 +138,7 @@ export default function ProductDetailPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Store className="w-4 h-4 text-[var(--color-text-tertiary)] shrink-0" />
-                <span className="font-semibold text-[var(--color-text)]">{supplier.name}</span>
+                <Link href={`/suppliers/${supplier.id}`} className="font-semibold text-[var(--color-text)] hover:text-[var(--color-brand-600)] transition-colors">{supplier.name}</Link>
               </div>
               {supplier.contact_person && (
                 <div className="text-sm text-[var(--color-text-secondary)] ml-6">{supplier.contact_person}</div>

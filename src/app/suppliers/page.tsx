@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import Link from 'next/link'
 import { fetchCategoriesWithSuppliers, fetchSuppliersWithStats } from '@/lib/api'
 import type { CategoryWithSuppliers, SupplierWithStats } from '@/lib/types'
 import {
@@ -60,7 +61,7 @@ export default function SuppliersPage() {
   const renderSupplierCard = (sup: CategoryWithSuppliers['suppliers'][0]) => {
     const detail = supplierDetails.get(sup.id)
     return (
-      <div key={sup.id} className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] overflow-hidden hover:shadow-md transition-all">
+      <Link key={sup.id} href={`/suppliers/${sup.id}`} className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] overflow-hidden hover:shadow-md hover:border-[var(--color-brand-200)] transition-all block">
         <div className="px-4 pt-4 pb-2 border-b border-[var(--color-border-light)]">
           <div className="flex items-start gap-2.5">
             <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-200">
@@ -111,7 +112,7 @@ export default function SuppliersPage() {
             <span>{detail?.last_receipt_date ? formatDate(detail.last_receipt_date) : '—'}</span>
           </div>
         </div>
-      </div>
+      </Link>
     )
   }
 

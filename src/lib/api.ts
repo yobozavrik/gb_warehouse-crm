@@ -1,5 +1,5 @@
 ﻿import { supabase } from './supabase'
-import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, Receipt, Order, StockMovement, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers } from './types'
+import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, Receipt, Order, StockMovement, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail } from './types'
 
 // ============================================================================
 // DASHBOARD
@@ -161,9 +161,15 @@ export async function createSupplierPayment(payment: {
   return data
 }
 
+export async function fetchSupplierDetail(supplierId: number): Promise<SupplierDetail> {
+  const { data, error } = await supabase.rpc('rpc_supplier_detail', {
+    p_supplier_id: supplierId,
+  })
+  if (error) throw error
+  return data
+}
+
 // ============================================================================
-// STOCK BALANCES
-// ============================================================================// ============================================================================
 // CATEGORIES WITH SUPPLIERS
 // ============================================================================
 export async function fetchCategoriesWithSuppliers(): Promise<CategoryWithSuppliers[]> {
@@ -172,7 +178,9 @@ export async function fetchCategoriesWithSuppliers(): Promise<CategoryWithSuppli
   return data
 }
 
-
+// ============================================================================
+// STOCK BALANCES
+// ============================================================================
 export async function fetchStockBalances(warehouseId?: number): Promise<StockBalance[]> {
   let query = supabase.from('stock_balances').select('*')
   if (warehouseId) query = query.eq('warehouse_id', warehouseId)

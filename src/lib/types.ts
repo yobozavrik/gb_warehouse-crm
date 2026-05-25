@@ -291,3 +291,58 @@ export interface CategoryWithSuppliers {
     total_products: number
   }>
 }
+
+export interface SupplierReceiptItem {
+  product_id: number
+  product_name: string
+  sku: string | null
+  quantity: number
+  price: number | null
+  total: number | null
+}
+
+export interface SupplierReceipt {
+  id: string
+  receipt_number: string
+  confirmed_at: string
+  warehouse_name: string
+  items_count: number
+  total_amount: number
+  items: SupplierReceiptItem[]
+}
+
+export interface SupplierDetail {
+  supplier: {
+    id: number
+    name: string
+    contact_person: string | null
+    phone: string | null
+    email: string | null
+    edrpou: string | null
+    category: string | null
+    website: string | null
+    payment_days: number | null
+    notes: string | null
+    created_at: string
+  }
+  receipts: SupplierReceipt[]
+  payments: Array<{
+    id: string
+    amount: number
+    payment_date: string
+    payment_method: string | null
+    reference_number: string | null
+    notes: string | null
+  }>
+  stats: {
+    total_receipts: number
+    total_items: number
+    total_amount: number
+    total_paid: number
+    total_debt: number
+    first_receipt_date: string | null
+    last_receipt_date: string | null
+    payment_count: number
+    last_payment_date: string | null
+  }
+}
