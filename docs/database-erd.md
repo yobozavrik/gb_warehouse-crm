@@ -1,5 +1,22 @@
 # Database ERD
 
+> **Update 2026-05:** see [`CHANGES.md`](CHANGES.md) for migrations 017–025.
+> New indexes / constraints since this ERD was first drawn:
+>
+> - `uq_telegram_pending_user_chat` — UNIQUE on `telegram_pending_orders(telegram_user_id, chat_id)` (mig 017).
+> - `uq_orders_telegram_msg` — partial unique on `orders(telegram_message_id) WHERE source = 'telegram'` (mig 019).
+> - `idx_products_name_trgm` / `idx_products_sku_trgm` — GIN trigram indexes from `pg_trgm` (mig 019).
+>
+> New RPCs that aren't tables but are reachable from the same schema:
+>
+> - `rpc_create_receipt_with_items` (mig 020) — atomic receipt + items.
+> - `rpc_pending_order_add_item` (mig 018) — atomic JSONB array merge.
+> - `rpc_telegram_replace_order_items` (mig 018) — DELETE + bulk INSERT under one lock.
+> - `cleanup_webhook_outbox` (mig 023) — retention job (manual or `pg_cron`).
+>
+> `confirm_receipt` / `confirm_transfer` / `confirm_write_off` / `complete_inventory`
+> now return JSONB instead of `void` (mig 025).
+
 ## Повна схема бази даних
 
 ```mermaid

@@ -625,7 +625,19 @@ paths:
                   nullable: true
       responses:
         "200":
-          description: void
+          description: |
+            JSONB result (migration 025):
+            `{ success, receipt_id, status: 'confirmed', confirmed_at, movements_created }`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  receipt_id: { type: string, format: uuid }
+                  status: { type: string, enum: [confirmed] }
+                  confirmed_at: { type: string, format: date-time }
+                  movements_created: { type: integer }
 
   /rpc/ship_order:
     post:
@@ -689,7 +701,19 @@ paths:
                   nullable: true
       responses:
         "200":
-          description: void
+          description: |
+            JSONB result (migration 025):
+            `{ success, transfer_id, status: 'completed', completed_at, movements_created }`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  transfer_id: { type: string, format: uuid }
+                  status: { type: string, enum: [completed] }
+                  completed_at: { type: string, format: date-time }
+                  movements_created: { type: integer }
 
   /rpc/confirm_write_off:
     post:
@@ -721,7 +745,19 @@ paths:
                   nullable: true
       responses:
         "200":
-          description: void
+          description: |
+            JSONB result (migration 025):
+            `{ success, write_off_id, status: 'confirmed', confirmed_at, movements_created }`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  write_off_id: { type: string, format: uuid }
+                  status: { type: string, enum: [confirmed] }
+                  confirmed_at: { type: string, format: date-time }
+                  movements_created: { type: integer }
 
   /rpc/complete_inventory:
     post:
@@ -753,7 +789,190 @@ paths:
                   nullable: true
       responses:
         "200":
-          description: void
+          description: |
+            JSONB result (migration 025):
+            `{ success, inventory_id, status: 'completed', completed_at, corrections_applied }`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  inventory_id: { type: string, format: uuid }
+                  status: { type: string, enum: [completed] }
+                  completed_at: { type: string, format: date-time }
+                  corrections_applied: { type: integer }
+
+  # ===========================================================================
+  # NEW WRITE RPCs (migrations 017–025)
+  # ===========================================================================
+  /rpc/rpc_create_receipt_with_items:
+    post:
+      summary: Create Receipt + Items (atomic)
+      description: |
+        Migration 020. Allocates `receipt_number` server-side if omitted,
+        inserts the receipt header and all items in one transaction.
+        Replaces the previous client-side flow that called
+        `next_document_number` then inserted into `receipt_items` separately
+        (which left orphan receipts on failure and required an anon grant
+        on `next_document_number`).
+      operationId: rpc_create_receipt_with_items
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_warehouse_id, p_items]
+              properties:
+                p_supplier_id: { type: integer, nullable: true }
+                p_warehouse_id: { type: integer }
+                p_notes: { type: string, nullable: true }
+                p_items:
+                  type: array
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id: { type: integer }
+                      quantity: { type: number }
+                      price: { type: number, nullable: true }
+                p_receipt_number: { type: string, nullable: true }
+                p_user_id: { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: |
+            On success: `{ success: true, receipt_id, receipt_number, items_inserted }`.
+            On validation failure: `{ success: false, error }`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  receipt_id: { type: string, format: uuid, nullable: true }
+                  receipt_number: { type: string, nullable: true }
+                  items_inserted: { type: integer, nullable: true }
+                  error: { type: string, nullable: true }
+
+  /rpc/cleanup_webhook_outbox:
+    post:
+      summary: Delete old outbox rows
+      description: |
+        Migration 023. Service-role only. Deletes
+        `pending`/`failed`/`cancelled` rows older than `p_days` (default 30).
+        Optionally scheduled by `pg_cron` (job
+        `household_chemicals_webhook_outbox_cleanup`, daily 03:00 UTC).
+      operationId: cleanup_webhook_outbox
+      security:
+        - SupabaseServiceRole: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_days: { type: integer, default: 30, minimum: 1 }
+      responses:
+        "200":
+          description: Number of rows deleted
+          content:
+            application/json:
+              schema: { type: integer }
+
+  # ===========================================================================
+  # SERVICE-ROLE ONLY (Telegram webhook internal)
+  # ===========================================================================
+  /rpc/rpc_pending_order_add_item:
+    post:
+      summary: Atomic pending-order item add
+      description: |
+        Migration 018. Service-role only. Locks the pending order row
+        (`FOR UPDATE`), merges by `product_id` (increments quantity) or
+        appends a new entry. Replaces a JS read-modify-write race.
+      operationId: rpc_pending_order_add_item
+      security:
+        - SupabaseServiceRole: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_telegram_user_id, p_chat_id, p_product_id, p_quantity]
+              properties:
+                p_telegram_user_id: { type: integer }
+                p_chat_id: { type: integer, format: int64 }
+                p_product_id: { type: integer }
+                p_quantity: { type: number }
+      responses:
+        "200":
+          description: |
+            `{ success, items? }` on success, `{ success: false, error }` if
+            no pending order exists.
+
+  /rpc/rpc_telegram_replace_order_items:
+    post:
+      summary: Atomic replace of order_items
+      description: |
+        Migration 018. Service-role only. Used by
+        `handleEditedOrderMessage`. Locks the order, deletes existing
+        `order_items`, bulk-inserts the new ones — one transaction.
+      operationId: rpc_telegram_replace_order_items
+      security:
+        - SupabaseServiceRole: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_order_id, p_items]
+              properties:
+                p_order_id: { type: string, format: uuid }
+                p_items:
+                  type: array
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id: { type: integer }
+                      quantity: { type: number }
+      responses:
+        "200":
+          description: "`{ success, inserted }`"
+
+  # ===========================================================================
+  # AUTH (operator login — S8)
+  # ===========================================================================
+  /api/auth/login:
+    post:
+      summary: Operator login (shared password)
+      description: |
+        Verifies `password` against `OPERATOR_PASSWORD` (constant-time).
+        On success, sets `op_session` httpOnly cookie equal to
+        `OPERATOR_SESSION_TOKEN`, 1-year maxAge. The `src/middleware.ts`
+        checks the cookie on every non-public route and redirects to
+        `/login` if it doesn't match.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        "200": { description: "`{ ok: true }` + Set-Cookie" }
+        "401": { description: "`{ error: 'Невірний пароль' }`" }
+        "500": { description: "Auth not configured (env vars missing)" }
+    delete:
+      summary: Operator logout
+      description: Clears the `op_session` cookie.
+      responses:
+        "200": { description: "`{ ok: true }`" }
 
   /rpc/set_initial_stock:
     post:

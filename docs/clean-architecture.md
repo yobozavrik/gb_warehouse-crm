@@ -1,5 +1,10 @@
 # Clean Architecture
 
+> **Update 2026-05:** see [`CHANGES.md`](CHANGES.md) for the delta added in
+> migrations 017–025, the shared-password gate (`src/middleware.ts`), and
+> the `DialogProvider` UI primitive. This document still describes the
+> original layout — read both.
+
 ## Огляд
 
 Проєкт використовує Clean Architecture з трьома чіткими шарами. Відмінність від класичного підходу — **бізнес-логіка знаходиться в PostgreSQL**, а не в окремому бекенд-сервісі.
@@ -85,8 +90,24 @@ graph TD
 
 | Компонент | Файл | Призначення |
 |---|---|---|
-| `Sidebar` | `components/Sidebar.tsx` | Бокова навігація з колапсом |
+| `Sidebar` | `components/Sidebar.tsx` | Бокова навігація + кнопка «Вийти» |
 | `ExportButton` | `components/ExportButton.tsx` | Експорт в XLSX |
+| `DialogProvider` | `components/DialogProvider.tsx` | `useDialog()` — Promise-based `confirm()` / `alert()` модалки замість нативних |
+
+### Auth gate (новий шар)
+
+```mermaid
+flowchart LR
+    Req[HTTP request] --> MW[src/middleware.ts]
+    MW -->|public path<br/>(login, telegram webhook, _next)| Next[pass through]
+    MW -->|cookie op_session matches<br/>OPERATOR_SESSION_TOKEN| Next
+    MW -->|otherwise| Redirect[302 → /login]
+    Login[/login page/] -->|POST /api/auth/login| Auth[/api/auth/login route/]
+    Auth -->|constant-time compare<br/>vs OPERATOR_PASSWORD| Set[Set-Cookie op_session]
+```
+
+Сторінка `/login` + `POST /api/auth/login` — server-side gate. Вимикається
+порожніми env vars (`OPERATOR_PASSWORD`, `OPERATOR_SESSION_TOKEN`) для dev.
 
 ### Стилізація
 
