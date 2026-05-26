@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchOrders, shipOrder } from '@/lib/api'
-import { ShoppingCart, Truck, Eye } from 'lucide-react'
+import type { OrderListItem } from '@/lib/types'
+import { ShoppingCart, Truck, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const statusLabels: Record<string, string> = {
   draft: 'Чернетка', submitted: 'Очікує', confirmed: 'Підтверджено',
@@ -21,22 +22,27 @@ const statusColors: Record<string, string> = {
 
 export default function OrdersPage() {
   const router = useRouter()
-  const [orders, setOrders] = useState<any[]>([])
+  const [orders, setOrders] = useState<OrderListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const pageSize = 20
 
-  const load = () => {
+  const load = (p: number) => {
     setLoading(true)
-    fetchOrders({ status: statusFilter || undefined }).then(r => setOrders(r.items)).finally(() => setLoading(false))
+    fetchOrders({ status: statusFilter || undefined, page: p, pageSize })
+      .then(r => { setOrders(r.items); setTotalPages(r.total_pages); setPage(r.page) })
+      .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [statusFilter])
+  useEffect(() => { load(page) }, [page, statusFilter])
 
   const handleShip = async (id: string) => {
     if (!confirm('Відвантажити заявку? Товари будуть списані зі складу.')) return
     try {
       await shipOrder(id)
-      load()
+      load(page)
     } catch (e) {
       console.error(e)
       alert('Помилка при відвантаженні')
@@ -48,7 +54,7 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Заявки магазинів</h1>
         <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
         >
           <option value="">Всі статуси</option>
           <option value="submitted">Очікують</option>
@@ -108,6 +114,19 @@ export default function OrdersPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+              <div className="text-sm text-gray-500">Сторінка {page} з {totalPages}</div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                ><ChevronLeft className="w-4 h-4" /> Назад</button>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >Далі <ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </div>
+          )}
           {orders.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <ShoppingCart className="w-12 h-12 mb-2" />
