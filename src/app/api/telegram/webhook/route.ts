@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
     const userName = msg.from?.username || null
     const firstName = msg.from?.first_name || null
     const lastName = msg.from?.last_name || null
-    const text = data || msg.text || ''
+    const text = data || msg.text || msg.caption || ''
     const isCallback = !!cbQuery
 
     if (!checkRateLimit(userId)) {
