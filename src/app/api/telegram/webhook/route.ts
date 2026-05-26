@@ -14,12 +14,15 @@ const RATE_LIMIT_MS = 500
 const rateLimitMap = new Map<number, number>()
 const RATE_LIMIT_CLEANUP_INTERVAL = 60000
 
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, ts] of rateLimitMap) {
-    if (now - ts > RATE_LIMIT_MS * 10) rateLimitMap.delete(key)
-  }
-}, RATE_LIMIT_CLEANUP_INTERVAL)
+declare global { var __rateLimitCleanup: NodeJS.Timeout | undefined }
+if (!globalThis.__rateLimitCleanup) {
+  globalThis.__rateLimitCleanup = setInterval(() => {
+    const now = Date.now()
+    for (const [key, ts] of rateLimitMap) {
+      if (now - ts > RATE_LIMIT_MS * 10) rateLimitMap.delete(key)
+    }
+  }, RATE_LIMIT_CLEANUP_INTERVAL)
+}
 
 function checkRateLimit(userId: number): boolean {
   const now = Date.now()
