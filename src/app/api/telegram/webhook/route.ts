@@ -769,8 +769,6 @@ function extractQty(line: string): number | null {
   for (let i = parts.length - 1; i >= 0; i--) {
     const m = parts[i].match(/^(\d+[\.,]?\d*)\s*(шт|уп|ящ|кг|л|мл|пач|грн)?$/)
     if (m) {
-      const unit = m[2] || ''
-      if (unit === 'л' && !m[1].includes('.') && m[1].length <= 2) continue
       return parseFloat(m[1].replace(',', '.'))
     }
   }
