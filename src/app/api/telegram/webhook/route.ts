@@ -249,8 +249,9 @@ export async function POST(req: NextRequest) {
 
   const start = Date.now()
   const supabase = getSupabase()
+  let update: any
   try {
-    const update = await req.json()
+    update = await req.json()
     const cbQuery = update.callback_query
     const editedMsg = update.edited_message
     const msg = update.message || cbQuery?.message
@@ -671,6 +672,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('Webhook error:', err)
+    try {
+      const chatInfo = update?.message?.chat || update?.edited_message?.chat || update?.callback_query?.message?.chat
+      const fromInfo = update?.message?.from || update?.edited_message?.from || update?.callback_query?.from
+      if (chatInfo && fromInfo) {
+        await (supabase as any).rpc('telegram_log_message', {
+          p_telegram_user_id: fromInfo.id,
+          p_chat_id: chatInfo.id,
+          p_message_id: (update?.message || update?.edited_message || update?.callback_query?.message)?.message_id || 0,
+          p_message_type: 'error',
+          p_error: String(err),
+          p_processing_time_ms: Date.now() - start,
+        })
+      }
+    } catch { /* ignore logging errors */ }
     return NextResponse.json({ ok: true })
   }
 }
