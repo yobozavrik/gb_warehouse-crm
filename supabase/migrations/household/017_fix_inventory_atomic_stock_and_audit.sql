@@ -287,90 +287,43 @@ $$;
 -- ============================================================================
 -- M7: Fix <= consistency — critical stock CTE should use <= (not <)
 -- ============================================================================
--- The fix lives in the v_stock_summary and v_critical_stock views.
--- We drop and recreate them (same names, fixed predicate).
+-- The 016 RPC already uses <= in the stats CTE. The views below keep the
+-- original multi-warehouse structure (no Cartesian issue — single row per
+-- stock_balances entry). We recreate them to apply any prior DROP CASCADE.
 DROP VIEW IF EXISTS household_chemicals.v_critical_stock CASCADE;
 DROP VIEW IF EXISTS household_chemicals.v_stock_summary CASCADE;
 
 CREATE VIEW household_chemicals.v_stock_summary AS
 SELECT
-    p.id AS product_id,
+    sb.warehouse_id,
+    w.name AS warehouse_name,
+    sb.product_id,
     p.name AS product_name,
+    p.sku,
     p.unit,
+    p.category_id,
+    pc.name AS category_name,
+    sb.quantity,
     p.min_stock,
-    COALESCE(SUM(sb.quantity), 0) AS total_quantity,
-    COALESCE(SUM(sb.quantity * COALESCE(p.cost_price, 0)), 0) AS total_value
-FROM household_chemicals.products p
-LEFT JOIN household_chemicals.stock_balances sb ON sb.product_id = p.id
-WHERE p.is_active = true
-GROUP BY p.id, p.name, p.unit, p.min_stock;
+    p.max_stock,
+    CASE
+        WHEN p.min_stock IS NOT NULL AND sb.quantity <= p.min_stock THEN 'critical'
+        WHEN p.max_stock IS NOT NULL AND sb.quantity >= p.max_stock THEN 'overstock'
+        ELSE 'normal'
+    END AS stock_status,
+    sb.updated_at
+FROM household_chemicals.stock_balances sb
+JOIN household_chemicals.products p ON p.id = sb.product_id
+LEFT JOIN household_chemicals.product_categories pc ON pc.id = p.category_id
+JOIN household_chemicals.warehouses w ON w.id = sb.warehouse_id
+WHERE p.is_active = true;
 
 CREATE VIEW household_chemicals.v_critical_stock AS
 SELECT *
 FROM household_chemicals.v_stock_summary
-WHERE min_stock IS NOT NULL AND total_quantity <= min_stock;
+WHERE stock_status = 'critical'
+ORDER BY warehouse_name, category_name, product_name;
 
--- ============================================================================
--- M8: Fix audit trigger — DELETE rows were never logged (INSERT after RETURN)
--- ============================================================================
-CREATE OR REPLACE FUNCTION household_chemicals.audit_trigger_func()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_action TEXT;
-    v_entity_id TEXT;
-    v_changes JSONB;
-BEGIN
-    IF TG_OP IN ('INSERT', 'UPDATE') THEN
-        v_entity_id := COALESCE(NEW.id::TEXT, OLD.id::TEXT);
-
-        IF TG_OP = 'INSERT' THEN
-            v_action := 'create';
-            v_changes := to_jsonb(NEW);
-        ELSE
-            v_action := 'update';
-            v_changes := jsonb_strip_nulls(to_jsonb(NEW) - to_jsonb(OLD));
-        END IF;
-    ELSIF TG_OP = 'DELETE' THEN
-        v_action := 'delete';
-        v_entity_id := OLD.id::TEXT;
-        v_changes := to_jsonb(OLD);
-    END IF;
-
-    INSERT INTO household_chemicals.audit_log (
-        action, entity_type, entity_id, changes
-    ) VALUES (
-        v_action, TG_TABLE_NAME, v_entity_id,
-        CASE WHEN v_changes = '{}'::jsonb THEN NULL ELSE v_changes END
-    );
-
-    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
-END;
-$$;
-
--- ============================================================================
--- M10: Add trigram indexes for product search
--- ============================================================================
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
-CREATE INDEX IF NOT EXISTS idx_products_name_trgm
-  ON household_chemicals.products USING gin (name gin_trgm_ops);
-
-CREATE INDEX IF NOT EXISTS idx_products_sku_trgm
-  ON household_chemicals.products USING gin (sku gin_trgm_ops);
-
--- ============================================================================
--- H15: Unique partial index on orders.telegram_message_id to prevent dupe orders
--- ============================================================================
-CREATE UNIQUE INDEX IF NOT EXISTS uq_orders_telegram_msg
-  ON household_chemicals.orders (telegram_message_id)
-  WHERE telegram_message_id IS NOT NULL AND source = 'telegram';
-
--- ============================================================================
--- Grants (re-grant after DROP VIEW CASCADE may have removed them)
--- ============================================================================
 GRANT SELECT ON household_chemicals.v_stock_summary TO anon, authenticated;
 GRANT SELECT ON household_chemicals.v_critical_stock TO anon, authenticated;
 
