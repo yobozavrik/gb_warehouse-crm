@@ -90,6 +90,7 @@ $$;
 
 -- ============================================================================
 -- S4: Add UNIQUE constraint on telegram_pending_orders (telegram_user_id, chat_id)
+-- Idempotent: skip if a constraint OR a unique index already covers the pair.
 -- ============================================================================
 DELETE FROM household_chemicals.telegram_pending_orders a
 USING household_chemicals.telegram_pending_orders b
@@ -97,9 +98,23 @@ WHERE a.telegram_user_id = b.telegram_user_id
   AND a.chat_id = b.chat_id
   AND a.created_at < b.created_at;
 
-ALTER TABLE household_chemicals.telegram_pending_orders
-  ADD CONSTRAINT uq_telegram_pending_user_chat
-  UNIQUE (telegram_user_id, chat_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = 'household_chemicals'
+          AND t.relname = 'telegram_pending_orders'
+          AND c.contype = 'u'
+          AND c.conname = 'uq_telegram_pending_user_chat'
+    ) THEN
+        ALTER TABLE household_chemicals.telegram_pending_orders
+          ADD CONSTRAINT uq_telegram_pending_user_chat
+          UNIQUE (telegram_user_id, chat_id);
+    END IF;
+END $$;
 
 -- ============================================================================
 -- S5: Atomic update_stock_balance — no lost-update race

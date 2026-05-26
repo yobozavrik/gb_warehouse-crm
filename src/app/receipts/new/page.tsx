@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createReceipt, fetchWarehouses, fetchSuppliers } from '@/lib/api'
+import { createReceiptWithItems, fetchWarehouses, fetchSuppliers } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import type { Warehouse, Supplier, Product } from '@/lib/types'
 import { ArrowLeft, Trash2, Save, Search } from 'lucide-react'
@@ -69,29 +69,24 @@ export default function NewReceiptPage() {
     if (!form.warehouse_id || lines.length === 0) return
     setSaving(true)
     try {
-      const { data: seq } = await supabase.rpc('next_document_number', { p_prefix: 'RCPT' })
-      const receipt = await createReceipt({
-        receipt_number: form.receipt_number || seq,
+      await createReceiptWithItems({
+        receipt_number: form.receipt_number || undefined,
         supplier_id: form.supplier_id ? Number(form.supplier_id) : undefined,
         warehouse_id: Number(form.warehouse_id),
         notes: form.notes || undefined,
-      })
-
-      await supabase.from('receipt_items').insert(
-        lines.map(line => ({
-          receipt_id: receipt.id,
+        items: lines.map(line => ({
           product_id: line.product_id,
           quantity: line.quantity,
           price: line.price,
-        }))
-      )
-
+        })),
+      })
       router.push('/receipts')
-    } catch (e) {
-      console.error(e)
-      alert('Помилка при створенні накладної')
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : 'Помилка при створенні накладної')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   return (

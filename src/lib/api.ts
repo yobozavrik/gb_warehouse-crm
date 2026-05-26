@@ -260,16 +260,25 @@ export async function fetchReceiptDetail(receiptId: string): Promise<{
   return { receipt, items, total }
 }
 
-export async function createReceipt(receipt: {
-  receipt_number: string; supplier_id?: number; warehouse_id: number; notes?: string
-}): Promise<Receipt> {
-  const { data, error } = await supabase
-    .from('receipts')
-    .insert([receipt])
-    .select()
-    .single()
+export async function createReceiptWithItems(input: {
+  supplier_id?: number
+  warehouse_id: number
+  notes?: string
+  receipt_number?: string
+  items: Array<{ product_id: number; quantity: number; price?: number | null }>
+}): Promise<{ receipt_id: string; receipt_number: string; items_inserted: number }> {
+  const { data, error } = await supabase.rpc('rpc_create_receipt_with_items', {
+    p_supplier_id: input.supplier_id ?? null,
+    p_warehouse_id: input.warehouse_id,
+    p_notes: input.notes ?? null,
+    p_items: input.items,
+    p_receipt_number: input.receipt_number?.trim() || null,
+    p_user_id: null,
+  })
   if (error) throw error
-  return data
+  const res = data as { success: boolean; error?: string; receipt_id: string; receipt_number: string; items_inserted: number }
+  if (!res?.success) throw new Error(res?.error || 'Не вдалося створити накладну')
+  return { receipt_id: res.receipt_id, receipt_number: res.receipt_number, items_inserted: res.items_inserted }
 }
 
 export async function confirmReceipt(receiptId: string): Promise<void> {
@@ -382,7 +391,7 @@ export async function completeInventory(inventoryId: string): Promise<void> {
 }
 
 // ============================================================================
-// GENERIC TABLE ACCESS (РґР»СЏ Р°СѓРґРёС‚Р° Рё РїСЂРѕСЃС‚С‹С… СЃРїСЂР°РІРѕС‡РЅРёРєРѕРІ)
+// GENERIC TABLE ACCESS (для аудиту та простих довідників)
 // ============================================================================
 export async function fetchFromTable<T>(table: string, options?: {
   orderBy?: string; orderAsc?: boolean; limit?: number

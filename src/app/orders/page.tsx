@@ -29,20 +29,27 @@ export default function OrdersPage() {
   const [totalPages, setTotalPages] = useState(1)
   const pageSize = 20
 
-  const load = (p: number) => {
-    setLoading(true)
-    fetchOrders({ status: statusFilter || undefined, page: p, pageSize })
-      .then(r => { setOrders(r.items); setTotalPages(r.total_pages); setPage(r.page) })
-      .finally(() => setLoading(false))
-  }
+  const [reloadToken, setReloadToken] = useState(0)
 
-  useEffect(() => { load(page) }, [page, statusFilter])
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetchOrders({ status: statusFilter || undefined, page, pageSize })
+      .then(r => {
+        if (cancelled) return
+        setOrders(r.items)
+        setTotalPages(r.total_pages)
+        setPage(r.page)
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [page, statusFilter, reloadToken])
 
   const handleShip = async (id: string) => {
     if (!confirm('Відвантажити заявку? Товари будуть списані зі складу.')) return
     try {
       await shipOrder(id)
-      load(page)
+      setReloadToken(t => t + 1)
     } catch (e) {
       console.error(e)
       alert('Помилка при відвантаженні')

@@ -35,15 +35,18 @@ export default function ShopsPage() {
   const [days, setDays] = useState(14)
   const [loading, setLoading] = useState(true)
 
-  const load = async (d: number) => {
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    const { data, error } = await supabase.rpc('rpc_shops_with_stats', { p_days: d })
-    if (!error) setShops(data || [])
-    else console.error(error)
-    setLoading(false)
-  }
-
-  useEffect(() => { load(days) }, [days])
+    ;(async () => {
+      const { data, error } = await supabase.rpc('rpc_shops_with_stats', { p_days: days })
+      if (cancelled) return
+      if (error) console.error(error)
+      else setShops(data || [])
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [days])
 
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat('uk-UA', { style: 'decimal', maximumFractionDigits: 0 }).format(v) + ' ₴'

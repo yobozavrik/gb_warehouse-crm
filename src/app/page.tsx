@@ -31,22 +31,22 @@ export default function DashboardPage() {
   const [selectedWarehouse, setSelectedWarehouse] = useState<number | undefined>()
   const [loading, setLoading] = useState(true)
 
-  const loadData = async (whId?: number) => {
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    try {
-      const [dashboard, wh] = await Promise.all([
-        fetchDashboardSummary(whId),
-        fetchWarehouses(),
-      ])
-      setData(dashboard)
-      setWarehouses(wh)
-    } catch (e) {
-      console.error(e)
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => { loadData(selectedWarehouse) }, [selectedWarehouse])
+    Promise.all([
+      fetchDashboardSummary(selectedWarehouse),
+      fetchWarehouses(),
+    ])
+      .then(([dashboard, wh]) => {
+        if (cancelled) return
+        setData(dashboard)
+        setWarehouses(wh)
+      })
+      .catch(e => { if (!cancelled) console.error(e) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedWarehouse])
 
   if (loading) return <div className="text-gray-500">Завантаження...</div>
   if (!data) return <div className="text-red-500">Помилка завантаження</div>

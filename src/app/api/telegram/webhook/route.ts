@@ -146,25 +146,9 @@ async function showQuantityButtons(supabase: SupabaseClient, chatId: number, mes
 }
 
 async function addItemToPendingOrder(supabase: SupabaseClient, tgUserId: number, chatId: number, productId: number, quantity: number) {
-  const { data: pending } = await supabase
-    .from('telegram_pending_orders')
-    .select('items')
-    .eq('telegram_user_id', tgUserId)
-    .eq('chat_id', chatId)
-    .single()
-  if (!pending) return false
-  const items = safeItems(pending.items)
-  const existing = items.find((i: any) => i.product_id === productId && i.quantity != null)
-  if (existing) {
-    existing.quantity = (existing.quantity || 0) + quantity
-  } else {
-    items.push({ product_id: productId, quantity })
-  }
-  const { error } = await supabase
-    .from('telegram_pending_orders')
-    .update({ items, step: 'adding_items' })
-    .eq('telegram_user_id', tgUserId)
-    .eq('chat_id', chatId)
+  const { error } = await supabase.rpc('rpc_pending_order_add_item', {
+    p_telegram_user_id: tgUserId, p_chat_id: chatId, p_product_id: productId, p_quantity: quantity,
+  })
   return !error
 }
 
@@ -695,12 +679,13 @@ export async function POST(req: NextRequest) {
       const chatInfo = update?.message?.chat || update?.edited_message?.chat || update?.callback_query?.message?.chat
       const fromInfo = update?.message?.from || update?.edited_message?.from || update?.callback_query?.from
       if (chatInfo && fromInfo) {
+        const errMsg = err instanceof Error ? (err.stack || err.message) : String(err)
         await (supabase as any).rpc('telegram_log_message', {
           p_telegram_user_id: fromInfo.id,
           p_chat_id: chatInfo.id,
           p_message_id: (update?.message || update?.edited_message || update?.callback_query?.message)?.message_id || 0,
-          p_message_type: 'error',
-          p_error: String(err),
+          p_message_type: 'other',
+          p_error: errMsg,
           p_processing_time_ms: Date.now() - start,
         })
       }
@@ -1016,9 +1001,6 @@ async function handleEditedOrderMessage(
   const order = orders[0]
   if (order.status === 'shipped' || order.status === 'cancelled') return
 
-  // Delete old items
-  await supabase.from('order_items').delete().eq('order_id', order.id)
-
   // Fetch products and re-parse
   const { data: products } = await supabase
     .from('products')
@@ -1028,6 +1010,9 @@ async function handleEditedOrderMessage(
 
   const { wordsList, prefixCount } = buildIdfCache(products)
   const lines = newText.split('\n').map(l => l.trim()).filter(Boolean)
+
+  const items: { product_id: number; quantity: number }[] = []
+  const unknown: string[] = []
 
   for (const line of lines) {
     if (/^(На |Дякую|Добрий|дякую)/i.test(line)) continue
@@ -1040,13 +1025,30 @@ async function handleEditedOrderMessage(
     const finalSearch = searchText || removeQtyFromText(clean, null)
 
     const product = matchProduct(finalSearch, products, wordsList, prefixCount)
-    if (!product) continue
+    if (!product) { unknown.push(clean); continue }
     if (qty <= 0 || qty > 999999) continue
 
-    await supabase.from('order_items').insert({
-      order_id: order.id,
-      product_id: product.id,
-      quantity_requested: Math.round(qty),
-    })
+    items.push({ product_id: product.id, quantity: Math.round(qty) })
   }
+
+  // Atomic replace via RPC
+  const { data: result } = await supabase.rpc('rpc_telegram_replace_order_items', {
+    p_order_id: order.id,
+    p_items: JSON.stringify(items),
+  })
+  const res = result as any
+  if (!res?.success) return
+
+  // Build reply
+  const replyParts: string[] = [`Заявку ${order.order_number} оновлено:`]
+  for (const item of items) {
+    const prod = products.find(p => p.id === item.product_id)
+    replyParts.push(`${item.quantity} ${prod?.unit || 'шт'} ${prod?.name || '?'}`)
+  }
+  if (unknown.length) {
+    replyParts.push('', 'Не розпізнано:')
+    unknown.forEach(u => replyParts.push(`— ${u}`))
+  }
+
+  await tgSend(chatId, replyParts.join('\n'))
 }
