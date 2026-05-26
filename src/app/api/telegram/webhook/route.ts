@@ -38,7 +38,7 @@ function safeText(text: string, maxLen = 4000): string {
 }
 
 function safeHTML(text: string): string {
-  return safeText(text).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return safeText(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function getCallbackParts(data: string, expected: number): string[] | null {
