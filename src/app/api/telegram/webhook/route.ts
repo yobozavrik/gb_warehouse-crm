@@ -937,6 +937,17 @@ async function parseGroupOrder(
 
   if (!items.length) return null
 
+  // Dedupe: check if this message was already processed
+  const { data: existing } = await supabase
+    .from('orders')
+    .select('id, order_number')
+    .eq('telegram_message_id', String(messageId))
+    .eq('source', 'telegram')
+    .maybeSingle()
+  if (existing) {
+    return { reply: `Заявка ${existing.order_number} вже створена за цим повідомленням.` }
+  }
+
   // Create order via RPC
   const { data: result } = await supabase.rpc('telegram_create_order', {
     p_telegram_user_id: tgUserId,
