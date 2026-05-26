@@ -121,7 +121,7 @@ export default function NewReceiptPage() {
                 value={form.warehouse_id} onChange={e => setForm({ ...form, warehouse_id: e.target.value })}
               >
                 <option value="">Оберіть склад</option>
-                {warehouses.filter(w => w.type === 'central').map(w => (
+                {warehouses.filter(w => w.warehouse_type === 'storage' || w.warehouse_type === 'other' || w.id === 1).map(w => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
               </select>
