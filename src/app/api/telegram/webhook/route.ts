@@ -65,31 +65,39 @@ function safeItems(items: unknown): any[] {
 }
 
 async function tgSend(chatId: number, text: string, parseMode?: string) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: safeText(text), ...(parseMode ? { parse_mode: parseMode } : {}) }),
-  })
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: safeText(text), ...(parseMode ? { parse_mode: parseMode } : {}) }),
+    })
+  } catch { /* ignore telegram send errors */ }
 }
 
 async function tgSendMenu(chatId: number, text: string, buttons: { text: string; callback_data: string }[][]) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: safeText(text), parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } }),
-  })
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: safeText(text), parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } }),
+    })
+  } catch { /* ignore telegram send errors */ }
 }
 
 async function tgEditMenu(chatId: number, messageId: number, text: string, buttons: { text: string; callback_data: string }[][]) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: safeText(text), parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } }),
-  })
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: safeText(text), parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons } }),
+    })
+  } catch { /* ignore telegram send errors */ }
 }
 
 async function tgAnswerCallback(callbackQueryId: string, text?: string) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ callback_query_id: callbackQueryId, ...(text ? { text: safeText(text) } : {}) }),
-  })
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, ...(text ? { text: safeText(text) } : {}) }),
+    })
+  } catch { /* ignore telegram send errors */ }
 }
 
 const DEFAULT_WAREHOUSE_ID = 1
