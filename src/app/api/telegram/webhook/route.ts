@@ -466,7 +466,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
 
       // Onboarding: user enters name
-      if (pending?.step === 'onboarding_name' && text.length > 0) {
+      if (pending?.step === 'onboarding_name' && text.length > 0 && !text.startsWith('/')) {
         const displayName = safeText(text, 200)
         await tgSend(chatId, 'Iм`я збережено: ' + displayName)
         await supabase.from('telegram_users').update({ display_name: displayName }).eq('id', tgUserId)
@@ -479,7 +479,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Onboarding: user enters phone
-      if (pending?.step === 'onboarding_phone' && text.length > 0) {
+      if (pending?.step === 'onboarding_phone' && text.length > 0 && !text.startsWith('/')) {
         const phone = safeText(text, 30)
         if (!/^[\d\s\-\+\(\)\.]{6,30}$/.test(phone)) {
           await tgSend(chatId, 'Введiть коректний номер телефону (тiльки цифри, +, -, пробiли)')
