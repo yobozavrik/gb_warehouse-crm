@@ -23,14 +23,14 @@
 
 | ID  | Status        | Where                                              |
 |-----|---------------|----------------------------------------------------|
-| S1  | partial       | current files redacted; **git history rewrite + key rotation still pending — human action** |
+| S1  | checklist     | `SECURITY_ROTATION.md` — pre-flight, rotation, history rewrite, post-checks |
 | S2  | done          | migration 017                                      |
 | S3  | done          | migration 017                                      |
 | S4  | done          | migration 017                                      |
 | S5  | done          | migration 017                                      |
 | S6  | done          | receipts/new filter switched to `warehouse_type IN ('storage','other') OR id===1` |
 | S7  | done          | migration 020 — atomic `rpc_create_receipt_with_items`; frontend updated |
-| S8  | open          | auth strategy decision — human                     |
+| S8  | done          | shared-password middleware + `/login` page + `/api/auth/login` route + logout button in Sidebar |
 | H1  | done          | migration 017 (introduced regression R1) + **fixed in migration 019** |
 | H2  | done          | migration 017 + `updated_at` fix in migration 019 (R3) |
 | H3  | done          | migration 018 + `route.ts` change                  |
@@ -49,7 +49,7 @@
 | M1  | done          | mojibake comment in api.ts:393 fixed               |
 | M2  | done          | onboarding now guards `!text.startsWith('/')`      |
 | M3  | done          | webhook catch writes to `telegram_messages_log` via `telegram_log_message` |
-| M4  | open          | webhook_outbox dispatcher — decision required      |
+| M4  | done          | migration 023 — `cleanup_webhook_outbox(p_days)` + optional pg_cron daily schedule |
 | M5  | done          | `л` exclusion rule removed from `extractQty`       |
 | M6  | done          | `expandAbbrevs` uses unicode-aware lookahead       |
 | M7  | done          | migration 019                                      |
@@ -63,20 +63,30 @@
 | L3  | partial       | orders uses `reloadToken`; other pages still refetch |
 | L4  | done          | duplicate status triggers removed in migration 017 (H11) |
 | L6  | done          | `.env.example` rewritten for this project          |
-| L7  | open          | year-boundary race in `next_document_number` (rare) |
+| L7  | done          | migration 024 — year + counter atomic via single INSERT…RETURNING |
 | L8  | done          | migration 022 — `confirm_transfer` / `confirm_write_off` notes in Ukrainian |
 | L9  | open          | `confirmReceipt` returns `void` (could return movement count) |
 | L10 | done          | `tgSend` / `tgEditMenu` / `tgAnswerCallback` wrapped in try/catch (commit 41a2e1e) |
 
-### New SQL files added in pass 2
+### New SQL files added in pass 2-5
 
 ```
-020_rpc_create_receipt.sql              (S7 + L5)
-021_telegram_create_order_warehouse_from_shop.sql   (H13)
-022_ukrainian_notes.sql                 (L8)
+020_rpc_create_receipt.sql                       (S7 + L5)
+021_telegram_create_order_warehouse_from_shop.sql (H13)
+022_ukrainian_notes.sql                          (L8)
+023_webhook_outbox_retention.sql                 (M4)
+024_next_document_number_year_safe.sql           (L7)
 ```
 
-Apply order: 017 → 018 → 019 → 020 → 021 → 022. All idempotent.
+Apply order: 017 → 018 → 019 → 020 → 021 → 022 → 023 → 024. All idempotent.
+
+### New files outside migrations
+
+- `SECURITY_ROTATION.md` — step-by-step rotation + git filter-repo checklist (S1).
+- `src/middleware.ts` + `src/app/login/page.tsx` + `src/app/api/auth/login/route.ts` —
+  shared-password gate (S8). Activate by setting `OPERATOR_PASSWORD` and
+  `OPERATOR_SESSION_TOKEN` in `.env`. With both empty, middleware passes
+  everything through (handy for dev).
 
 ### Regressions introduced by migration 017 (now fixed)
 

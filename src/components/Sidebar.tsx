@@ -6,8 +6,9 @@ import {
   LayoutDashboard, Package, Truck, ShoppingCart, MoveRight,
   ClipboardX, ClipboardList, Warehouse, Store, Users,
   FileSpreadsheet, Shield, Boxes, Building2, ChevronDown,
-  Menu, X,
+  Menu, X, LogOut,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 const navItems = [
@@ -89,8 +90,21 @@ function NavLink({ href, icon: Icon, label, active }: {
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [expanded, setExpanded] = useState<string[]>(['Прихід', 'Довідники'])
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const handleLogout = async () => {
+    setLoggingOut(true)
+    try {
+      await fetch('/api/auth/login', { method: 'DELETE' })
+    } catch (err) {
+      console.error(err)
+    }
+    router.replace('/login')
+    router.refresh()
+  }
 
   const toggleExpand = (label: string) => {
     setExpanded(prev =>
@@ -123,7 +137,8 @@ export function Sidebar() {
           <span className="font-semibold text-gray-900">Складський облік</span>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+        <nav className="flex flex-col h-[calc(100%-4rem)] overflow-y-auto p-3 space-y-1">
+          <div className="flex-1 space-y-1">
           {navItems.map(item => {
             if ('children' in item && item.children) {
               const isExpanded = expanded.includes(item.label)
@@ -173,6 +188,15 @@ export function Sidebar() {
               </div>
             )
           })}
+          </div>
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors disabled:opacity-50"
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span>{loggingOut ? 'Вихід…' : 'Вийти'}</span>
+          </button>
         </nav>
       </aside>
 
