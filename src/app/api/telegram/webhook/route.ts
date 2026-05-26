@@ -94,6 +94,15 @@ async function tgAnswerCallback(callbackQueryId: string, text?: string) {
 
 const DEFAULT_WAREHOUSE_ID = 1
 
+async function getWarehouseForShop(supabase: SupabaseClient, shopId: number): Promise<number> {
+  const { data: shop } = await supabase
+    .from('shops')
+    .select('warehouse_id')
+    .eq('id', shopId)
+    .maybeSingle()
+  return shop?.warehouse_id || DEFAULT_WAREHOUSE_ID
+}
+
 async function showCategories(supabase: SupabaseClient, chatId: number, messageId: number | undefined, prefix: string) {
   const { data: cats } = await supabase.rpc('rpc_categories_tree')
   const categories = (cats as any[]) || []
@@ -199,10 +208,12 @@ async function confirmOrder(supabase: SupabaseClient, chatId: number, messageId:
     return
   }
 
+  const warehouseId = await getWarehouseForShop(supabase, pending.shop_id)
+
   const { data: result, error } = await supabase.rpc('telegram_create_order', {
     p_telegram_user_id: tgUserId,
     p_shop_id: pending.shop_id,
-    p_warehouse_id: DEFAULT_WAREHOUSE_ID,
+    p_warehouse_id: warehouseId,
     p_items: JSON.stringify(items.map(i => ({ product_id: i.product_id, quantity: i.quantity }))),
     p_notes: null,
     p_telegram_message_id: null,
@@ -963,11 +974,14 @@ async function parseGroupOrder(
     return { reply: `Заявка ${existing.order_number} вже створена за цим повідомленням.` }
   }
 
+  // Find the warehouse for this shop
+  const warehouseId = await getWarehouseForShop(supabase, shopId)
+
   // Create order via RPC
   const { data: result } = await supabase.rpc('telegram_create_order', {
     p_telegram_user_id: tgUserId,
     p_shop_id: shopId,
-    p_warehouse_id: 1,
+    p_warehouse_id: warehouseId,
     p_items: JSON.stringify(items),
     p_notes: text.substring(0, 500),
     p_telegram_message_id: String(messageId),
