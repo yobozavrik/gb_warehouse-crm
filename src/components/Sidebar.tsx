@@ -24,11 +24,8 @@ const navItems = [
   },
   {
     label: 'Прихід',
-    icon: Truck,
-    children: [
-      { label: 'Накладні', href: '/receipts', icon: FileSpreadsheet },
-      { label: 'Постачальники', href: '/suppliers', icon: Building2 },
-    ],
+    href: '/receipts',
+    icon: FileSpreadsheet,
   },
   {
     label: 'Заявки',
@@ -60,6 +57,7 @@ const navItems = [
     icon: Boxes,
     children: [
       { label: 'Товари', href: '/products', icon: Package },
+      { label: 'Постачальники', href: '/suppliers', icon: Building2 },
       { label: 'Склади', href: '/warehouses', icon: Warehouse },
       { label: 'Магазини', href: '/shops', icon: Store },
     ],
