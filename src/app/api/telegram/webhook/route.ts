@@ -688,7 +688,7 @@ const ALLOWED_SINGLE = new Set(['s', 'm', 'l', 'x'])
 function expandAbbrevs(text: string): string {
   let result = text.toLowerCase()
   for (const [short, full] of Object.entries(ABBREV_MAP)) {
-    result = result.replace(new RegExp(`\\b${short}\\b`, 'g'), full)
+    result = result.replace(new RegExp(`(^|[^а-яіїєґa-z])${short}(?=$|[^а-яіїєґa-z])`, 'gu'), `$1${full}`)
   }
   return result
 }
