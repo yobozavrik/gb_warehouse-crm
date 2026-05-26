@@ -131,19 +131,32 @@ git clone "D:\Химия замолвення ГБ\warehouse-crm" "warehouse-crm
 
 ### E.3 — Build the replacement file
 
-Create `D:\Химия замолвення ГБ\warehouse-crm\..git-secret-replacements.txt`
-(outside the repo working tree — name it however you want, do NOT commit it):
+Create a file **outside the repo working tree** (so it's never committed),
+e.g. `D:\git-secret-replacements.txt`. For each old secret string, add one
+line of the form `OLD==>NEW`. Use the **old** value (the leaked one) on the
+left and a placeholder on the right.
+
+Template (fill the left side from your rotated-out secrets):
 
 ```
-eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2MzI0OTcwMCwiZXhwIjo0OTE4OTIzMzAwLCJyb2xlIjoiYW5vbiJ9.PJ-feVraUpYtvUWqDYrNGafyNRRqCSCM35tAVQCrztw==>REDACTED_ANON_KEY
-eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2MzI0OTcwMCwiZXhwIjo0OTE4OTIzMzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.QC9C9-CxocHb-jM-lHmXHEjEZV2hCOaSwgfxKLjKoEQ==>REDACTED_SERVICE_ROLE
-8927414072:AAEH1WSyXia2TqWsnYXwSY0UsT_6aKtxMXE==>REDACTED_BOT_TOKEN
-63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c==>REDACTED_WEBHOOK_SECRET
-526379:9669514747b2a48f329dac43b6997c42==>REDACTED_POSTER_TOKEN
+<old NEXT_PUBLIC_SUPABASE_ANON_KEY>==>REDACTED_ANON_KEY
+<old SUPABASE_SERVICE_ROLE_KEY>==>REDACTED_SERVICE_ROLE
+<old TELEGRAM_BOT_TOKEN>==>REDACTED_BOT_TOKEN
+<old TELEGRAM_WEBHOOK_SECRET>==>REDACTED_WEBHOOK_SECRET
+<old POSTER_TOKEN>==>REDACTED_POSTER_TOKEN
 ```
 
-The `==>` separator means "replace LEFT with RIGHT in every commit content (not
-messages)". Save the file as UTF-8 without BOM.
+You can find the exact old strings by running, **before rotation**:
+
+```powershell
+cd "D:\Химия замолвення ГБ\warehouse-crm"
+git show 976ee40:AGENTS.md | Select-String -Pattern "eyJ0eXAi|^[0-9]+:|^[0-9a-f]{64}$" | Select-Object -Property Line
+```
+
+The `==>` separator means "replace LEFT with RIGHT in every commit content
+(not messages)". Save the file as UTF-8 without BOM.
+
+> **Do not commit this file.** Place it outside the repo. After E.7 delete it.
 
 ### E.4 — Run filter-repo
 
@@ -157,10 +170,19 @@ git filter-repo --replace-text "..\..git-secret-replacements.txt" --force
 
 ### E.5 — Verify the strings are gone
 
+Pick a few distinctive substrings from your **old** values (e.g. 10–12
+characters from the middle of each token) and grep the rewritten history:
+
 ```powershell
-git log --all -p | Select-String "eyJ0eXAi|AAEH1WSyXia|526379:96695|63cf9308835af505"
+# Replace the placeholders with real fragments of your old (rotated-out) keys.
+$patterns = "<frag-of-old-anon>", "<frag-of-old-service>", "<frag-of-old-bot>", "<frag-of-old-webhook>", "<frag-of-old-poster>"
+git log --all -p | Select-String -Pattern ($patterns -join "|")
 # Expected output: nothing. If anything matches — STOP, do not push.
 ```
+
+If you no longer have the old values handy (you rotated already), use the
+file `D:\git-secret-replacements.txt` you built in E.3 — the left-hand side
+of each `==>` line is exactly what you need to grep for.
 
 ### E.6 — Re-add the remote and force-push
 
@@ -178,7 +200,7 @@ git push --force --tags origin
 ### E.7 — Delete the replacement file
 
 ```powershell
-Remove-Item "D:\Химия замолвення ГБ\.git-secret-replacements.txt"
+Remove-Item "D:\git-secret-replacements.txt"
 # Just in case — it contained the old secrets.
 ```
 

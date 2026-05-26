@@ -3,7 +3,8 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const TOKEN = '526379:9669514747b2a48f329dac43b6997c42';
+const TOKEN = process.env.POSTER_TOKEN || '';
+if (!TOKEN) throw new Error('POSTER_TOKEN not set (run with `node --env-file=.env scripts/fetch_poster_supplies.mjs`)');
 const WAREHOUSE_POSTER_STORAGE_ID = 37;
 const CONCURRENCY = 3;
 

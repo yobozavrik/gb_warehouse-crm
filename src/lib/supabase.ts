@@ -4,17 +4,15 @@ let _supabase: SupabaseClient | null = null
 let _serviceSupabase: SupabaseClient | null = null
 
 function getSupabaseUrl(): string {
-  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    return process.env.NEXT_PUBLIC_SUPABASE_URL
-  }
-  return 'https://supabase.dmytrotovstytskyi.online'
+  const url = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : ''
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
+  return url
 }
 
 function getAnonKey(): string {
-  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  }
-  return 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2MzI0OTcwMCwiZXhwIjo0OTE4OTIzMzAwLCJyb2xlIjoiYW5vbiJ9.PJ-feVraUpYtvUWqDYrNGafyNRRqCSCM35tAVQCrztw'
+  const key = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : ''
+  if (!key) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set')
+  return key
 }
 
 function getServiceKey(): string {

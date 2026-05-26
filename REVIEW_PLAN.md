@@ -23,7 +23,7 @@
 
 | ID  | Status        | Where                                              |
 |-----|---------------|----------------------------------------------------|
-| S1  | checklist     | `SECURITY_ROTATION.md` — pre-flight, rotation, history rewrite, post-checks |
+| S1  | checklist + HEAD clean | HEAD scrubbed of live keys (scripts/, supabase.ts, openapi.yaml, SECURITY_ROTATION.md). `SECURITY_ROTATION.md` still tracks the remaining history rewrite + key rotation (human action). |
 | S2  | done          | migration 017                                      |
 | S3  | done          | migration 017                                      |
 | S4  | done          | migration 017                                      |
@@ -130,7 +130,7 @@ After applying 019, run the post-apply verification queries listed at the bottom
 4. In `AGENTS.md` (both copies) and `PLAN.md`: replace every secret with `<redacted — see .env>`. Commit the redacted version.
 5. Tell the human to run `git filter-repo --replace-text` (or BFG) on the old key strings, then force-push if the repo has a remote. **Do not run filter-repo yourself** — destructive history rewrite is the human's call.
 
-**Acceptance:** `grep -r 'eyJ0eXAi\|AAEH1WSyXia\|526379:96695\|63cf9308835af505' .` from repo root returns nothing. Old keys no longer authenticate against Supabase/Telegram/Poster (the human verifies).
+**Acceptance:** see `SECURITY_ROTATION.md` step E.5 — grep history with distinctive fragments of the old (rotated-out) keys and confirm zero matches. Old keys no longer authenticate against Supabase/Telegram/Poster (verify via the curl commands in step G).
 
 ---
 

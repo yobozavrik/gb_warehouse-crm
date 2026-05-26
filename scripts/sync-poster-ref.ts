@@ -1,12 +1,17 @@
 // Скрипт: синхронизация справочников магазинов и складов из Poster
-// Запуск: npx tsx scripts/sync-poster-ref.ts
+// Запуск (Windows PowerShell): node --env-file=.env -e "require('tsx/cjs').register(); require('./scripts/sync-poster-ref.ts')"
+//   или: npx -y dotenv-cli -e .env -- npx tsx scripts/sync-poster-ref.ts
 
-const POSTER_TOKEN = '526379:9669514747b2a48f329dac43b6997c42'
-const POSTER_ACCOUNT = 'galia-baluvana34'
+const POSTER_TOKEN = process.env.POSTER_TOKEN || ''
+const POSTER_ACCOUNT = process.env.POSTER_ACCOUNT || ''
+if (!POSTER_TOKEN) throw new Error('POSTER_TOKEN not set')
+if (!POSTER_ACCOUNT) throw new Error('POSTER_ACCOUNT not set')
+
 const POSTER_API = 'https://joinposter.com/api'
 
-const SUPABASE_URL = 'https://supabase.dmytrotovstytskyi.online'
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+if (!SUPABASE_URL) throw new Error('NEXT_PUBLIC_SUPABASE_URL not set')
 if (!SUPABASE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY not set')
 
 interface PosterSpot {

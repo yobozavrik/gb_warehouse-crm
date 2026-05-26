@@ -7,9 +7,9 @@ info:
     Supabase SDK для виклику RPC. Telegram webhook — єдиний публічний ендпоінт.
 
     ## Authentication
-    - **anon key** (фронтенд): `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...`
-    - **service_role key** (Telegram webhook): `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...`
-    - **Telegram webhook secret token**: `<redacted>`
+    - **anon key** (фронтенд): беремо з `NEXT_PUBLIC_SUPABASE_ANON_KEY` в `.env`.
+    - **service_role key** (Telegram webhook): беремо з `SUPABASE_SERVICE_ROLE_KEY` в `.env` (server-side only).
+    - **Telegram webhook secret token**: беремо з `TELEGRAM_WEBHOOK_SECRET` в `.env`.
 
     ## Schema
     Всі таблиці та RPC знаходяться в схемі `household_chemicals`.
