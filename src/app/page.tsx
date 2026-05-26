@@ -51,8 +51,8 @@ export default function DashboardPage() {
   if (loading) return <div className="text-gray-500">Завантаження...</div>
   if (!data) return <div className="text-red-500">Помилка завантаження</div>
 
+  const fmt = (n: number) => new Intl.NumberFormat('uk-UA', { style: 'decimal', maximumFractionDigits: 0 }).format(n) + ' ₴'
   const s = data.stats
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -93,7 +93,7 @@ export default function DashboardPage() {
         <StatCard icon={TrendingDown} label="Товарів немає в наявності" value={s.products_out_of_stock} color="bg-gray-500" />
         <StatCard icon={Building2} label="Активних складів" value={s.active_warehouses} color="bg-purple-500" />
         <StatCard icon={FileSpreadsheet} label="Чернеток накладних" value={s.draft_receipts} color="bg-cyan-500" />
-        <StatCard icon={Package} label="Вартість запасів" value={`${s.stock_value.toLocaleString()} ₴`} color="bg-emerald-500" />
+        <StatCard icon={Package} label="Вартість запасів" value={fmt(s.stock_value)} color="bg-emerald-500" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -171,7 +171,7 @@ export default function DashboardPage() {
                     {m.quantity_change > 0 ? '+' : ''}{m.quantity_change}
                   </td>
                   <td className="py-2 text-right text-gray-500">
-                    {new Date(m.created_at).toLocaleString('uk')}
+                    {new Date(m.created_at).toLocaleString('uk-UA')}
                   </td>
                 </tr>
               ))}
