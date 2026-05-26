@@ -58,7 +58,7 @@
 | M10 | done          | migration 019                                      |
 | M11 | done          | `Warehouse.type` removed from `types.ts`           |
 | M12 | done          | `/status` now uses `text.slice(7).trim()`          |
-| L1  | open          | native `confirm()` / `alert()`                     |
+| L1  | done          | `DialogProvider` + `useDialog()` hook; all 20 `confirm()`/`alert()` calls replaced |
 | L2  | done          | `Eye` import removed from orders                   |
 | L3  | partial       | orders uses `reloadToken`; other pages still refetch |
 | L4  | done          | duplicate status triggers removed in migration 017 (H11) |

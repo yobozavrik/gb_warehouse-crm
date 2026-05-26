@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { confirmTransfer } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { useDialog } from '@/components/DialogProvider'
 import { MoveRight, CheckCircle } from 'lucide-react'
 
 const statusColors: Record<string, string> = {
@@ -18,6 +19,7 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function TransfersPage() {
+  const dialog = useDialog()
   const [transfers, setTransfers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -33,13 +35,16 @@ export default function TransfersPage() {
   useEffect(() => { load() }, [])
 
   const handleConfirm = async (id: string) => {
-    if (!confirm('Провести переміщення?')) return
+    if (!(await dialog.confirm('Товари будуть списані з джерела і оприбутковані на отримувачі.', {
+      title: 'Провести переміщення?',
+      confirmText: 'Провести',
+    }))) return
     try {
       await confirmTransfer(id)
       load()
     } catch (e) {
       console.error(e)
-      alert('Помилка')
+      await dialog.alert('Не вдалося провести переміщення.', { tone: 'error' })
     }
   }
 

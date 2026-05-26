@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchOrders, shipOrder } from '@/lib/api'
 import type { OrderListItem } from '@/lib/types'
+import { useDialog } from '@/components/DialogProvider'
 import { ShoppingCart, Truck, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const statusLabels: Record<string, string> = {
@@ -22,6 +23,7 @@ const statusColors: Record<string, string> = {
 
 export default function OrdersPage() {
   const router = useRouter()
+  const dialog = useDialog()
   const [orders, setOrders] = useState<OrderListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
@@ -46,13 +48,16 @@ export default function OrdersPage() {
   }, [page, statusFilter, reloadToken])
 
   const handleShip = async (id: string) => {
-    if (!confirm('Відвантажити заявку? Товари будуть списані зі складу.')) return
+    if (!(await dialog.confirm('Товари будуть списані зі складу і додані до відвантаження.', {
+      title: 'Відвантажити заявку?',
+      confirmText: 'Відвантажити',
+    }))) return
     try {
       await shipOrder(id)
       setReloadToken(t => t + 1)
     } catch (e) {
       console.error(e)
-      alert('Помилка при відвантаженні')
+      await dialog.alert('Не вдалося відвантажити заявку.', { tone: 'error' })
     }
   }
 

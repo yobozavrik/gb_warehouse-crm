@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { fetchOrderDetail, updateOrderItem, addOrderItem, removeOrderItem, confirmOrder } from '@/lib/api'
 import { fetchProducts } from '@/lib/api'
+import { useDialog } from '@/components/DialogProvider'
 import { ArrowLeft, Check, Plus, Trash2, Truck } from 'lucide-react'
 
 const statusLabels: Record<string, string> = {
@@ -23,6 +24,7 @@ const statusColors: Record<string, string> = {
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const dialog = useDialog()
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -54,22 +56,28 @@ export default function OrderDetailPage() {
     setSaving(true)
     try {
       const res = await updateOrderItem(itemId, qty)
-      if (!res.success) { alert(res.error); return }
+      if (!res.success) { await dialog.alert(res.error || 'Не вдалося оновити позицію.', { tone: 'error' }); return }
       setEditingId(null)
       load()
-    } catch (e) { alert('Помилка при оновленні') }
-    finally { setSaving(false) }
+    } catch {
+      await dialog.alert('Не вдалося оновити позицію.', { tone: 'error' })
+    } finally { setSaving(false) }
   }
 
   const handleRemoveItem = async (itemId: string) => {
-    if (!confirm('Видалити позицію?')) return
+    if (!(await dialog.confirm('Позиція буде видалена із заявки.', {
+      title: 'Видалити позицію?',
+      confirmText: 'Видалити',
+      tone: 'error',
+    }))) return
     setSaving(true)
     try {
       const res = await removeOrderItem(itemId)
-      if (!res.success) { alert(res.error); return }
+      if (!res.success) { await dialog.alert(res.error || 'Не вдалося видалити позицію.', { tone: 'error' }); return }
       load()
-    } catch (e) { alert('Помилка при видаленні') }
-    finally { setSaving(false) }
+    } catch {
+      await dialog.alert('Не вдалося видалити позицію.', { tone: 'error' })
+    } finally { setSaving(false) }
   }
 
   const handleAddItem = async () => {
@@ -79,25 +87,30 @@ export default function OrderDetailPage() {
     setSaving(true)
     try {
       const res = await addOrderItem(id, newProductId, qty)
-      if (!res.success) { alert(res.error); return }
+      if (!res.success) { await dialog.alert(res.error || 'Не вдалося додати товар.', { tone: 'error' }); return }
       setShowAddItem(false)
       setNewProductId(null)
       setNewQty('')
       setSearchTerm('')
       load()
-    } catch (e) { alert('Помилка при додаванні') }
-    finally { setSaving(false) }
+    } catch {
+      await dialog.alert('Не вдалося додати товар.', { tone: 'error' })
+    } finally { setSaving(false) }
   }
 
   const handleConfirm = async () => {
-    if (!confirm('Провести заявку? Товари будуть списані зі складу та переміщені на склад магазину.')) return
+    if (!(await dialog.confirm('Товари будуть списані зі складу та переміщені на склад магазину.', {
+      title: 'Провести заявку?',
+      confirmText: 'Провести',
+    }))) return
     setSaving(true)
     try {
       const res = await confirmOrder(id)
-      if (!res.success) { alert(res.error); return }
+      if (!res.success) { await dialog.alert(res.error || 'Не вдалося провести заявку.', { tone: 'error' }); return }
       load()
-    } catch (e) { alert('Помилка при проведенні') }
-    finally { setSaving(false) }
+    } catch {
+      await dialog.alert('Не вдалося провести заявку.', { tone: 'error' })
+    } finally { setSaving(false) }
   }
 
   const openAddItem = async () => {

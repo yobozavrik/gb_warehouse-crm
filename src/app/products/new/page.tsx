@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProduct, fetchCategoriesTree } from '@/lib/api'
 import type { ProductCategory } from '@/lib/types'
+import { useDialog } from '@/components/DialogProvider'
 import { ArrowLeft, Save } from 'lucide-react'
 import Link from 'next/link'
 
@@ -15,6 +16,7 @@ function safeNum(v: string | undefined): number | undefined {
 
 export default function NewProductPage() {
   const router = useRouter()
+  const dialog = useDialog()
   const [categories, setCategories] = useState<ProductCategory[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -46,7 +48,7 @@ export default function NewProductPage() {
       router.push('/products')
     } catch (e) {
       console.error(e)
-      alert('Помилка при створенні товару')
+      await dialog.alert('Не вдалося створити товар.', { tone: 'error' })
     }
     setSaving(false)
   }

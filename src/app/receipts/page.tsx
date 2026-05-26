@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { fetchReceipts, confirmReceipt } from '@/lib/api'
 import type { ReceiptListItem } from '@/lib/types'
+import { useDialog } from '@/components/DialogProvider'
 import { Plus, CheckCircle, Package, Search } from 'lucide-react'
 
 const statusLabels: Record<string, { label: string; color: string }> = {
@@ -23,6 +24,7 @@ function formatCurrency(n: number) {
 
 export default function ReceiptsPage() {
   const router = useRouter()
+  const dialog = useDialog()
   const [receipts, setReceipts] = useState<ReceiptListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState<string | null>(null)
@@ -37,14 +39,17 @@ export default function ReceiptsPage() {
 
   const handleConfirm = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    if (!confirm('Підтвердити прихід? Товари будуть оприбутковані.')) return
+    if (!(await dialog.confirm('Товари будуть оприбутковані на складі.', {
+      title: 'Підтвердити прихід?',
+      confirmText: 'Підтвердити',
+    }))) return
     setConfirming(id)
     try {
       await confirmReceipt(id)
       load()
     } catch (err) {
       console.error(err)
-      alert('Помилка при підтвердженні')
+      await dialog.alert('Не вдалося підтвердити прихід.', { tone: 'error' })
     }
     setConfirming(null)
   }

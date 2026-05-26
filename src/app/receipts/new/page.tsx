@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createReceiptWithItems, fetchWarehouses, fetchSuppliers } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import type { Warehouse, Supplier, Product } from '@/lib/types'
+import { useDialog } from '@/components/DialogProvider'
 import { ArrowLeft, Trash2, Save, Search } from 'lucide-react'
 import Link from 'next/link'
 
@@ -22,6 +23,7 @@ interface ReceiptLine {
 
 export default function NewReceiptPage() {
   const router = useRouter()
+  const dialog = useDialog()
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -83,7 +85,7 @@ export default function NewReceiptPage() {
       router.push('/receipts')
     } catch (err) {
       console.error(err)
-      alert(err instanceof Error ? err.message : 'Помилка при створенні накладної')
+      await dialog.alert(err instanceof Error ? err.message : 'Не вдалося створити накладну.', { tone: 'error' })
     } finally {
       setSaving(false)
     }

@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { completeInventory } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { useDialog } from '@/components/DialogProvider'
 import { ClipboardList, CheckCircle } from 'lucide-react'
 
 export default function InventoryPage() {
+  const dialog = useDialog()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -21,13 +23,16 @@ export default function InventoryPage() {
   useEffect(() => { load() }, [])
 
   const handleComplete = async (id: string) => {
-    if (!confirm('Завершити інвентаризацію? Залишки будуть скориговані.')) return
+    if (!(await dialog.confirm('Залишки будуть скориговані за результатами інвентаризації.', {
+      title: 'Завершити інвентаризацію?',
+      confirmText: 'Завершити',
+    }))) return
     try {
       await completeInventory(id)
       load()
     } catch (e) {
       console.error(e)
-      alert('Помилка')
+      await dialog.alert('Не вдалося завершити інвентаризацію.', { tone: 'error' })
     }
   }
 

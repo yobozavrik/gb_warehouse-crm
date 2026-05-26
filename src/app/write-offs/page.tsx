@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { confirmWriteOff } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { useDialog } from '@/components/DialogProvider'
 import { ClipboardX, CheckCircle } from 'lucide-react'
 
 const reasonLabels: Record<string, string> = {
@@ -11,6 +12,7 @@ const reasonLabels: Record<string, string> = {
 }
 
 export default function WriteOffsPage() {
+  const dialog = useDialog()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -26,13 +28,16 @@ export default function WriteOffsPage() {
   useEffect(() => { load() }, [])
 
   const handleConfirm = async (id: string) => {
-    if (!confirm('Підтвердити списання?')) return
+    if (!(await dialog.confirm('Залишки будуть зменшені згідно акту списання.', {
+      title: 'Підтвердити списання?',
+      confirmText: 'Підтвердити',
+    }))) return
     try {
       await confirmWriteOff(id)
       load()
     } catch (e) {
       console.error(e)
-      alert('Помилка')
+      await dialog.alert('Не вдалося підтвердити списання.', { tone: 'error' })
     }
   }
 
