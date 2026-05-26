@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { fetchReceiptDetail } from '@/lib/api'
+import type { ReceiptDetailResponse } from '@/lib/types'
 import { ArrowLeft, Package, Building2, Warehouse, FileSpreadsheet } from 'lucide-react'
 
 function formatDate(d: string) {
@@ -23,7 +24,7 @@ const statusLabels: Record<string, { label: string; color: string }> = {
 export default function ReceiptDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const [data, setData] = useState<{ receipt: any; items: any[]; total: number } | null>(null)
+  const [data, setData] = useState<ReceiptDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

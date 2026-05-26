@@ -443,8 +443,24 @@ export interface RpcResult {
   id?: string
 }
 
+export interface ReceiptListItem extends Receipt {
+  supplier: { id: number; name: string } | null
+  warehouse: { id: number; name: string } | null
+  receipt_items: Array<{ count: number }>
+}
+
+export interface ReceiptWithRefs extends Receipt {
+  supplier: Supplier | null
+  warehouse: Warehouse | null
+}
+
+export interface ReceiptItemWithProduct extends ReceiptItem {
+  product: Pick<Product, 'id' | 'name' | 'sku' | 'unit'>
+  created_at?: string
+}
+
 export interface ReceiptDetailResponse {
-  receipt: any
-  items: any[]
+  receipt: ReceiptWithRefs
+  items: ReceiptItemWithProduct[]
   total: number
 }

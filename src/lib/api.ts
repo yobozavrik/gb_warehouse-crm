@@ -1,5 +1,5 @@
 ﻿import { supabase } from './supabase'
-import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, Receipt, Order, StockMovement, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail, StockSummaryItem, CriticalStockItem, StockMovementItem, OrderListItem, OrderDetailResponse, RpcResult, ReceiptDetailResponse } from './types'
+import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail, StockSummaryItem, CriticalStockItem, StockMovementItem, OrderListItem, OrderDetailResponse, RpcResult, ReceiptDetailResponse, ReceiptListItem } from './types'
 
 // ============================================================================
 // DASHBOARD
@@ -228,20 +228,16 @@ export async function fetchStockMovements(options?: {
 // ============================================================================
 // RECEIPTS
 // ============================================================================
-export async function fetchReceipts(): Promise<Receipt[]> {
+export async function fetchReceipts(): Promise<ReceiptListItem[]> {
   const { data, error } = await supabase
     .from('receipts')
     .select('*, supplier:supplier_id(id, name), warehouse:warehouse_id(id, name), receipt_items:receipt_items(count)')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data
+  return (data ?? []) as unknown as ReceiptListItem[]
 }
 
-export async function fetchReceiptDetail(receiptId: string): Promise<{
-  receipt: any
-  items: any[]
-  total: number
-}> {
+export async function fetchReceiptDetail(receiptId: string): Promise<ReceiptDetailResponse> {
   const { data: receipt, error: e1 } = await supabase
     .from('receipts')
     .select('*, supplier:supplier_id(*), warehouse:warehouse_id(*)')
@@ -256,8 +252,13 @@ export async function fetchReceiptDetail(receiptId: string): Promise<{
     .order('created_at', { ascending: true })
   if (e2) throw e2
 
-  const total = items.reduce((acc, i) => acc + (i.total || 0), 0)
-  return { receipt, items, total }
+  const itemsList = (items ?? []) as unknown as ReceiptDetailResponse['items']
+  const total = itemsList.reduce((acc, i) => acc + (i.total ?? 0), 0)
+  return {
+    receipt: receipt as unknown as ReceiptDetailResponse['receipt'],
+    items: itemsList,
+    total,
+  }
 }
 
 export async function createReceiptWithItems(input: {

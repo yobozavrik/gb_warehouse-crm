@@ -54,20 +54,29 @@
 | M6  | done          | `expandAbbrevs` uses unicode-aware lookahead       |
 | M7  | done          | migration 019                                      |
 | M8  | done          | migration 019                                      |
-| M9  | open          | `any` types in api.ts                              |
+| M9  | done          | `ReceiptListItem`, `ReceiptDetailResponse`, and friends added; `any` removed from api.ts |
 | M10 | done          | migration 019                                      |
 | M11 | done          | `Warehouse.type` removed from `types.ts`           |
 | M12 | done          | `/status` now uses `text.slice(7).trim()`          |
-| L*  | open          | all low-priority items                             |
+| L1  | open          | native `confirm()` / `alert()`                     |
+| L2  | done          | `Eye` import removed from orders                   |
+| L3  | partial       | orders uses `reloadToken`; other pages still refetch |
+| L4  | done          | duplicate status triggers removed in migration 017 (H11) |
+| L6  | done          | `.env.example` rewritten for this project          |
+| L7  | open          | year-boundary race in `next_document_number` (rare) |
+| L8  | done          | migration 022 — `confirm_transfer` / `confirm_write_off` notes in Ukrainian |
+| L9  | open          | `confirmReceipt` returns `void` (could return movement count) |
+| L10 | done          | `tgSend` / `tgEditMenu` / `tgAnswerCallback` wrapped in try/catch (commit 41a2e1e) |
 
 ### New SQL files added in pass 2
 
 ```
 020_rpc_create_receipt.sql              (S7 + L5)
 021_telegram_create_order_warehouse_from_shop.sql   (H13)
+022_ukrainian_notes.sql                 (L8)
 ```
 
-Apply order: 017 → 018 → 019 → 020 → 021. All idempotent.
+Apply order: 017 → 018 → 019 → 020 → 021 → 022. All idempotent.
 
 ### Regressions introduced by migration 017 (now fixed)
 

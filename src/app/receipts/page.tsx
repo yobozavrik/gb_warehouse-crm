@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { fetchReceipts, confirmReceipt } from '@/lib/api'
+import type { ReceiptListItem } from '@/lib/types'
 import { Plus, CheckCircle, Package, Search } from 'lucide-react'
 
 const statusLabels: Record<string, { label: string; color: string }> = {
@@ -22,7 +23,7 @@ function formatCurrency(n: number) {
 
 export default function ReceiptsPage() {
   const router = useRouter()
-  const [receipts, setReceipts] = useState<any[]>([])
+  const [receipts, setReceipts] = useState<ReceiptListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState<string | null>(null)
   const [search, setSearch] = useState('')
