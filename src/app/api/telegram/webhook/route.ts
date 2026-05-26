@@ -249,9 +249,29 @@ export async function POST(req: NextRequest) {
   try {
     const update = await req.json()
     const cbQuery = update.callback_query
+    const editedMsg = update.edited_message
     const msg = update.message || cbQuery?.message
     const data = cbQuery?.data || ''
-    if (!msg) return NextResponse.json({ ok: true })
+    if (!msg && !editedMsg) return NextResponse.json({ ok: true })
+
+    // Обробка редагованих повідомлень
+    if (editedMsg && !cbQuery) {
+      const eChatId = editedMsg.chat.id
+      const eUserId = editedMsg.from?.id
+      if (!checkRateLimit(eUserId)) return NextResponse.json({ ok: true })
+
+      const { data: eTgUser } = await supabase.rpc('telegram_get_or_create_user', {
+        p_user_id: eUserId, p_username: editedMsg.from?.username || null,
+        p_first_name: editedMsg.from?.first_name || null, p_last_name: editedMsg.from?.last_name || null,
+      })
+      if (!eTgUser) return NextResponse.json({ ok: true })
+
+      const eText = editedMsg.text || editedMsg.caption || ''
+      if (eText && eChatId < 0) {
+        await handleEditedOrderMessage(supabase, eTgUser.id, editedMsg.message_id, eChatId, eText)
+      }
+      return NextResponse.json({ ok: true })
+    }
 
     const chatId = msg.chat.id
     const messageId = msg.message_id
@@ -491,6 +511,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Груповий чат — парсинг заявок
+      if (chatId < 0 && text.length > 0 && !text.startsWith('/') && tgUserData.shop_id && !pending) {
+        const parsed = await parseGroupOrder(supabase, text, tgUserId, tgUserData.shop_id, chatId, messageId)
+        if (parsed) {
+          await tgSend(chatId, parsed.reply)
+          return NextResponse.json({ ok: true })
+        }
+      }
+
       // Auto-onboarding for new users
       if (!tgUserData.display_name && !text.startsWith('/')) {
         await startOnboarding(supabase, chatId, tgUserId)
@@ -640,5 +669,140 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('Webhook error:', err)
     return NextResponse.json({ ok: true })
+  }
+}
+
+// ============================================================================
+// GROUP CHAT ORDER PARSING
+// ============================================================================
+async function findProductMatches(supabase: SupabaseClient, text: string): Promise<any[]> {
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, name, sku, unit')
+    .eq('is_active', true)
+  if (!products) return []
+
+  const textLower = text.toLowerCase()
+  const matches: any[] = []
+
+  for (const p of products) {
+    const nameLower = p.name?.toLowerCase() || ''
+    const skuLower = p.sku?.toLowerCase() || ''
+    const words = nameLower.split(/[\s,]+/).filter((w: string) => w.length > 2)
+
+    // Перевіряємо чи є назва товару (або ключове слово) в тексті
+    const found = words.some((w: string) => textLower.includes(w)) ||
+      (skuLower && textLower.includes(skuLower)) ||
+      textLower.includes(nameLower)
+
+    if (found) matches.push(p)
+  }
+  return matches
+}
+
+function extractQuantities(text: string, productName: string): number[] {
+  const textLower = text.toLowerCase()
+  const nameLower = productName.toLowerCase()
+  const quantities: number[] = []
+
+  // Патерн: "10 шт Назва" або "10 Назва"
+  const beforeRegex = new RegExp(`(\\d+[\\.,]?\\d*)\\s*(?:шт|пач|кг|л|г|мл)?\\s*${escapeRegex(nameLower)}`, 'i')
+  const beforeMatch = textLower.match(beforeRegex)
+  if (beforeMatch) quantities.push(parseFloat(beforeMatch[1].replace(',', '.')))
+
+  // Патерн: "Назва 10 шт" або "Назва 10"
+  const afterRegex = new RegExp(`${escapeRegex(nameLower)}\\s*(?:[-,]\\s*)?(\\d+[\\.,]?\\d*)\\s*(?:шт|пач|кг|л|г|мл)?`, 'i')
+  const afterMatch = textLower.match(afterRegex)
+  if (afterMatch) quantities.push(parseFloat(afterMatch[1].replace(',', '.')))
+
+  return quantities
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function parseGroupOrder(
+  supabase: SupabaseClient, text: string, tgUserId: number,
+  shopId: number, chatId: number, messageId: number
+): Promise<{ reply: string } | null> {
+  // Знаходимо товари, які згадуються в тексті
+  const matchedProducts = await findProductMatches(supabase, text)
+  if (matchedProducts.length === 0) return null
+
+  const items: { product_id: number; quantity: number }[] = []
+
+  for (const p of matchedProducts) {
+    const qty = extractQuantities(text, p.name)
+    const quantity = qty.length > 0 ? Math.max(...qty) : 1
+    if (quantity > 0 && quantity <= 999999) {
+      items.push({ product_id: p.id, quantity })
+    }
+  }
+
+  if (items.length === 0) return null
+
+  // Створюємо заявку
+  const { data: result } = await supabase.rpc('telegram_create_order', {
+    p_telegram_user_id: tgUserId,
+    p_shop_id: shopId,
+    p_warehouse_id: 1,
+    p_items: JSON.stringify(items),
+    p_notes: text.substring(0, 500),
+    p_telegram_message_id: String(messageId),
+  })
+  const res = result as any
+
+  if (!res?.success) return null
+
+  const itemLines = items.map((i: any) => {
+    const p = matchedProducts.find((mp: any) => mp.id === i.product_id)
+    return `${i.quantity} ${p?.unit || 'шт'} ${p?.name || '?'}`
+  }).join('\n')
+
+  return {
+    reply: `✅ Заявка ${res.order_number} створена\n\n${itemLines}\n\n/status ${res.order_number}`,
+  }
+}
+
+async function handleEditedOrderMessage(
+  supabase: SupabaseClient, tgUserId: number, editedMessageId: number, chatId: number, newText: string
+): Promise<void> {
+  // Шукаємо заявку за telegram_message_id
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, order_number, status')
+    .eq('telegram_message_id', String(editedMessageId))
+    .eq('source', 'telegram')
+
+  if (!orders || orders.length === 0) return
+
+  const order = orders[0]
+  if (order.status === 'shipped' || order.status === 'cancelled') return
+
+  // Видаляємо старі позиції
+  const { data: oldItems } = await supabase
+    .from('order_items')
+    .select('id')
+    .eq('order_id', order.id)
+
+  if (oldItems) {
+    for (const item of oldItems) {
+      await supabase.from('order_items').delete().eq('id', item.id)
+    }
+  }
+
+  // Парсимо новий текст і додаємо позиції
+  const matchedProducts = await findProductMatches(supabase, newText)
+  for (const p of matchedProducts) {
+    const qty = extractQuantities(newText, p.name)
+    const quantity = qty.length > 0 ? Math.max(...qty) : 1
+    if (quantity > 0 && quantity <= 999999) {
+      await supabase.from('order_items').insert({
+        order_id: order.id,
+        product_id: p.id,
+        quantity_requested: quantity,
+      })
+    }
   }
 }

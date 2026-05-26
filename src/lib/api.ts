@@ -318,6 +318,42 @@ export async function shipOrder(orderId: string): Promise<any> {
   return data
 }
 
+export async function updateOrderItem(itemId: string, quantity: number): Promise<any> {
+  const { data, error } = await supabase.rpc('order_update_item', {
+    p_item_id: itemId,
+    p_quantity: quantity,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function addOrderItem(orderId: string, productId: number, quantity: number): Promise<any> {
+  const { data, error } = await supabase.rpc('order_add_item', {
+    p_order_id: orderId,
+    p_product_id: productId,
+    p_quantity: quantity,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function removeOrderItem(itemId: string): Promise<any> {
+  const { data, error } = await supabase.rpc('order_remove_item', {
+    p_item_id: itemId,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function confirmOrder(orderId: string): Promise<any> {
+  const { data, error } = await supabase.rpc('order_confirm', {
+    p_order_id: orderId,
+    p_user_id: null,
+  })
+  if (error) throw error
+  return data
+}
+
 // ============================================================================
 // TRANSFERS / WRITE-OFFS / INVENTORY
 // ============================================================================

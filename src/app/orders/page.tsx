@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { fetchOrders, shipOrder } from '@/lib/api'
-import { ShoppingCart, Truck } from 'lucide-react'
+import { ShoppingCart, Truck, Eye } from 'lucide-react'
 
 const statusLabels: Record<string, string> = {
   draft: 'Чернетка', submitted: 'Очікує', confirmed: 'Підтверджено',
@@ -19,6 +20,7 @@ const statusColors: Record<string, string> = {
 }
 
 export default function OrdersPage() {
+  const router = useRouter()
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
@@ -75,7 +77,11 @@ export default function OrdersPage() {
             <tbody>
               {orders.map(o => (
                 <tr key={o.id} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{o.order_number}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <button onClick={() => router.push(`/orders/${o.id}`)} className="text-blue-600 hover:text-blue-800">
+                      {o.order_number}
+                    </button>
+                  </td>
                   <td className="px-4 py-3">{o.shop_name}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[o.status] || ''}`}>
