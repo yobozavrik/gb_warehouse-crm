@@ -3,17 +3,17 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { fetchCategoriesWithSuppliers, fetchSuppliersWithStats } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import type { CategoryWithSuppliers, SupplierWithStats } from '@/lib/types'
 import {
-  Building2, Package, DollarSign, CalendarDays, Phone, Mail,
-  MapPin, Globe, FileText, User, Search, Store,
-  TrendingUp, Clock, CreditCard,
-  ArrowDownRight, ShoppingBag,
+  Building2, Phone, User, Search, Store, Clock, CalendarDays, ShoppingBag,
 } from 'lucide-react'
 
 export default function SuppliersPage() {
   const [categories, setCategories] = useState<CategoryWithSuppliers[]>([])
   const [supplierDetails, setSupplierDetails] = useState<Map<number, SupplierWithStats>>(new Map())
+  const [activeIds, setActiveIds] = useState<Set<number>>(new Set())
+  const [householdOnly, setHouseholdOnly] = useState(true)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -21,11 +21,17 @@ export default function SuppliersPage() {
     Promise.all([
       fetchCategoriesWithSuppliers().catch(() => []),
       fetchSuppliersWithStats().catch(() => []),
-    ]).then(([cats, sups]) => {
+      supabase.from('suppliers').select('id, is_household_active').then(r => r.data || []),
+    ]).then(([cats, sups, flags]) => {
       setCategories(cats)
       const map = new Map<number, SupplierWithStats>()
       sups.forEach(s => map.set(s.id, s))
       setSupplierDetails(map)
+      const active = new Set<number>()
+      ;(flags as Array<{ id: number; is_household_active: boolean }>).forEach(f => {
+        if (f.is_household_active) active.add(f.id)
+      })
+      setActiveIds(active)
     }).catch(console.error).finally(() => setLoading(false))
   }, [])
 
@@ -38,16 +44,18 @@ export default function SuppliersPage() {
   }
 
   const filteredCategories = useMemo(() => {
-    if (!search) return categories
+    const q = search.trim().toLowerCase()
     return categories
       .map(cat => ({
         ...cat,
-        suppliers: cat.suppliers.filter(s =>
-          s.name.toLowerCase().includes(search.toLowerCase())
-        )
+        suppliers: cat.suppliers.filter(s => {
+          if (householdOnly && !activeIds.has(s.id)) return false
+          if (q && !s.name.toLowerCase().includes(q)) return false
+          return true
+        }),
       }))
       .filter(cat => cat.suppliers.length > 0)
-  }, [categories, search])
+  }, [categories, search, householdOnly, activeIds])
 
   const allSuppliers = useMemo(() => {
     const set = new Set<number>()
@@ -144,9 +152,21 @@ export default function SuppliersPage() {
         </div>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-tertiary)]" />
-        <input type="text" placeholder="Пошук постачальника за назвою..." className="w-full pl-10 pr-4 py-2.5 border border-[var(--color-border)] rounded-xl text-sm bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-200)] focus:border-[var(--color-brand-400)] transition-shadow" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-md flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-tertiary)]" />
+          <input type="text" placeholder="Пошук постачальника за назвою..." className="w-full pl-10 pr-4 py-2.5 border border-[var(--color-border)] rounded-xl text-sm bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-200)] focus:border-[var(--color-brand-400)] transition-shadow" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 cursor-pointer hover:bg-[var(--color-surface-subtle)]">
+          <input
+            type="checkbox"
+            className="rounded border-gray-300"
+            checked={householdOnly}
+            onChange={e => setHouseholdOnly(e.target.checked)}
+          />
+          Тільки активні наші
+          <span className="text-xs text-[var(--color-text-tertiary)]">({activeIds.size})</span>
+        </label>
       </div>
 
       {loading ? (
