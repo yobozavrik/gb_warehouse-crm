@@ -634,8 +634,8 @@ export async function POST(req: NextRequest) {
         )
         return NextResponse.json({ ok: true })
       }
-      if (text.startsWith('/status ')) {
-        const orderNumber = safeText(text.replace('/status ', '').trim(), 50)
+      if (text.startsWith('/status')) {
+        const orderNumber = safeText(text.slice(7).trim(), 50)
         if (!/^[A-Za-z0-9-]+$/.test(orderNumber)) {
           await tgSend(chatId, 'Некоректний номер заявки')
           return NextResponse.json({ ok: true })
