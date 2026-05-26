@@ -348,3 +348,103 @@ export interface SupplierDetail {
     last_payment_date: string | null
   }
 }
+
+// ============================================================================
+// M9 — typed RPC returns
+// ============================================================================
+export interface StockSummaryItem {
+  warehouse_id: number
+  warehouse_name: string
+  product_id: number
+  product_name: string
+  sku: string | null
+  unit: string
+  category_id: number | null
+  category_name: string | null
+  quantity: number
+  min_stock: number | null
+  max_stock: number | null
+  stock_status: 'critical' | 'overstock' | 'normal'
+  updated_at: string
+}
+
+export type CriticalStockItem = StockSummaryItem
+
+export interface StockMovementItem {
+  id: string
+  product_name: string
+  warehouse_name: string
+  movement_type: string
+  quantity_change: number
+  created_at: string
+}
+
+export interface OrderListItem {
+  id: string
+  order_number: string
+  shop_id: number
+  shop_name: string
+  warehouse_id: number
+  warehouse_name: string
+  status: string
+  source: string
+  notes: string | null
+  created_by_name: string
+  items_count: number
+  total_requested: number
+  total_shipped: number
+  submitted_at: string | null
+  confirmed_at: string | null
+  shipped_at: string | null
+  created_at: string
+}
+
+export interface OrderDetailResponse {
+  order: {
+    id: string
+    order_number: string
+    shop_id: number
+    shop_name: string
+    warehouse_id: number
+    warehouse_name: string
+    status: string
+    source: string
+    telegram_message_id: string | null
+    notes: string | null
+    created_by_name: string
+    submitted_at: string | null
+    confirmed_at: string | null
+    shipped_at: string | null
+    created_at: string
+  }
+  items: Array<{
+    id: string
+    product_id: number
+    product_name: string
+    sku: string | null
+    unit: string
+    quantity_requested: number
+    quantity_shipped: number
+    notes: string | null
+  }>
+  shipments: Array<{
+    id: string
+    shipment_number: string
+    status: string
+    shipped_at: string | null
+    created_at: string
+  }>
+}
+
+export interface RpcResult {
+  success: boolean
+  error?: string
+  order_number?: string
+  id?: string
+}
+
+export interface ReceiptDetailResponse {
+  receipt: any
+  items: any[]
+  total: number
+}

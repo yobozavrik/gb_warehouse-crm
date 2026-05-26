@@ -1,5 +1,5 @@
 ﻿import { supabase } from './supabase'
-import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, Receipt, Order, StockMovement, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail } from './types'
+import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, Receipt, Order, StockMovement, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail, StockSummaryItem, CriticalStockItem, StockMovementItem, OrderListItem, OrderDetailResponse, RpcResult, ReceiptDetailResponse } from './types'
 
 // ============================================================================
 // DASHBOARD
@@ -189,7 +189,7 @@ export async function fetchStockBalances(warehouseId?: number): Promise<StockBal
   return data
 }
 
-export async function fetchStockSummary(warehouseId?: number): Promise<any[]> {
+export async function fetchStockSummary(warehouseId?: number): Promise<StockSummaryItem[]> {
   let query = supabase.from('v_stock_summary').select('*')
   if (warehouseId) query = query.eq('warehouse_id', warehouseId)
   const { data, error } = await query.order('warehouse_name').order('category_name').order('product_name')
@@ -197,7 +197,7 @@ export async function fetchStockSummary(warehouseId?: number): Promise<any[]> {
   return data
 }
 
-export async function fetchCriticalStock(warehouseId?: number): Promise<any[]> {
+export async function fetchCriticalStock(warehouseId?: number): Promise<CriticalStockItem[]> {
   let query = supabase.from('v_critical_stock').select('*')
   if (warehouseId) query = query.eq('warehouse_id', warehouseId)
   const { data, error } = await query
@@ -211,7 +211,7 @@ export async function fetchCriticalStock(warehouseId?: number): Promise<any[]> {
 export async function fetchStockMovements(options?: {
   productId?: number; warehouseId?: number; movementType?: string
   dateFrom?: string; dateTo?: string; page?: number; pageSize?: number
-}): Promise<PaginatedResponse<any>> {
+}): Promise<PaginatedResponse<StockMovementItem>> {
   const { data, error } = await supabase.rpc('rpc_stock_movements_list', {
     p_product_id: options?.productId ?? null,
     p_warehouse_id: options?.warehouseId ?? null,
@@ -228,7 +228,7 @@ export async function fetchStockMovements(options?: {
 // ============================================================================
 // RECEIPTS
 // ============================================================================
-export async function fetchReceipts(): Promise<any[]> {
+export async function fetchReceipts(): Promise<Receipt[]> {
   const { data, error } = await supabase
     .from('receipts')
     .select('*, supplier:supplier_id(id, name), warehouse:warehouse_id(id, name), receipt_items:receipt_items(count)')
@@ -286,7 +286,7 @@ export async function confirmReceipt(receiptId: string): Promise<void> {
 export async function fetchOrders(options?: {
   status?: string; warehouseId?: number; shopId?: number
   source?: string; page?: number; pageSize?: number
-}): Promise<PaginatedResponse<any>> {
+}): Promise<PaginatedResponse<OrderListItem>> {
   const { data, error } = await supabase.rpc('rpc_orders_list', {
     p_status: options?.status ?? null,
     p_warehouse_id: options?.warehouseId ?? null,
@@ -301,7 +301,7 @@ export async function fetchOrders(options?: {
   return data
 }
 
-export async function fetchOrderDetail(orderId: string): Promise<any> {
+export async function fetchOrderDetail(orderId: string): Promise<OrderDetailResponse> {
   const { data, error } = await supabase.rpc('rpc_order_detail', {
     p_order_id: orderId,
   })
@@ -309,7 +309,7 @@ export async function fetchOrderDetail(orderId: string): Promise<any> {
   return data
 }
 
-export async function shipOrder(orderId: string): Promise<any> {
+export async function shipOrder(orderId: string): Promise<void> {
   const { data, error } = await supabase.rpc('ship_order', {
     p_order_id: orderId,
     p_user_id: null,
@@ -318,7 +318,7 @@ export async function shipOrder(orderId: string): Promise<any> {
   return data
 }
 
-export async function updateOrderItem(itemId: string, quantity: number): Promise<any> {
+export async function updateOrderItem(itemId: string, quantity: number): Promise<RpcResult> {
   const { data, error } = await supabase.rpc('order_update_item', {
     p_item_id: itemId,
     p_quantity: quantity,
@@ -327,7 +327,7 @@ export async function updateOrderItem(itemId: string, quantity: number): Promise
   return data
 }
 
-export async function addOrderItem(orderId: string, productId: number, quantity: number): Promise<any> {
+export async function addOrderItem(orderId: string, productId: number, quantity: number): Promise<RpcResult> {
   const { data, error } = await supabase.rpc('order_add_item', {
     p_order_id: orderId,
     p_product_id: productId,
@@ -337,7 +337,7 @@ export async function addOrderItem(orderId: string, productId: number, quantity:
   return data
 }
 
-export async function removeOrderItem(itemId: string): Promise<any> {
+export async function removeOrderItem(itemId: string): Promise<RpcResult> {
   const { data, error } = await supabase.rpc('order_remove_item', {
     p_item_id: itemId,
   })
@@ -345,7 +345,7 @@ export async function removeOrderItem(itemId: string): Promise<any> {
   return data
 }
 
-export async function confirmOrder(orderId: string): Promise<any> {
+export async function confirmOrder(orderId: string): Promise<RpcResult> {
   const { data, error } = await supabase.rpc('order_confirm', {
     p_order_id: orderId,
     p_user_id: null,
@@ -400,7 +400,7 @@ export async function fetchFromTable<T>(table: string, options?: {
 // ============================================================================
 // EXPORT (CSV)
 // ============================================================================
-export async function exportStockSummary(warehouseId?: number): Promise<any[]> {
+export async function exportStockSummary(warehouseId?: number): Promise<StockSummaryItem[]> {
   return fetchStockSummary(warehouseId)
 }
 
