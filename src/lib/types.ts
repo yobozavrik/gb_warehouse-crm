@@ -496,3 +496,79 @@ export interface CompleteInventoryResult {
   completed_at: string
   corrections_applied: number
 }
+
+export interface CreateInventoryResult {
+  success: boolean
+  error?: string
+  inventory_id?: string
+  inventory_number?: string
+  items_seeded?: number
+}
+
+export interface InventoryItem {
+  id: string
+  product_id: number
+  product_name: string
+  sku: string | null
+  unit: string
+  category_id: number | null
+  category_name: string | null
+  expected_quantity: number
+  actual_quantity: number
+  difference: number
+  notes: string | null
+}
+
+export interface InventoryHeader {
+  id: string
+  inventory_number: string
+  warehouse_id: number
+  warehouse_name: string
+  status: 'draft' | 'in_progress' | 'completed' | 'cancelled'
+  notes: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface InventoryStats {
+  total_positions: number
+  with_diff: number
+  surplus_count: number
+  shortage_count: number
+  surplus_units: number
+  shortage_units: number
+}
+
+export interface InventoryDetail {
+  success: boolean
+  error?: string
+  inventory: InventoryHeader
+  items: InventoryItem[]
+  stats: InventoryStats
+}
+
+export interface SetActualResult {
+  success: boolean
+  error?: string
+  item_id?: string
+  actual_quantity?: number
+  difference?: number
+}
+
+export interface AddProductResult {
+  success: boolean
+  error?: string
+  item_id?: string
+  expected?: number
+  actual?: number
+  updated_existing?: boolean
+}
+
+export interface ResortResult {
+  success: boolean
+  error?: string
+  from?: { product_id: number; name: string }
+  to?: { product_id: number; name: string }
+  quantity?: number
+  marker?: string
+}

@@ -1,5 +1,5 @@
 ﻿import { supabase } from './supabase'
-import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail, StockSummaryItem, CriticalStockItem, StockMovementItem, OrderListItem, OrderDetailResponse, RpcResult, ReceiptDetailResponse, ReceiptListItem, ConfirmReceiptResult, ConfirmTransferResult, ConfirmWriteOffResult, CompleteInventoryResult } from './types'
+import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail, StockSummaryItem, CriticalStockItem, StockMovementItem, OrderListItem, OrderDetailResponse, RpcResult, ReceiptDetailResponse, ReceiptListItem, ConfirmReceiptResult, ConfirmTransferResult, ConfirmWriteOffResult, CompleteInventoryResult, CreateInventoryResult, InventoryDetail, SetActualResult, AddProductResult, ResortResult } from './types'
 
 // ============================================================================
 // DASHBOARD
@@ -393,6 +393,74 @@ export async function completeInventory(inventoryId: string): Promise<CompleteIn
   })
   if (error) throw error
   return data as CompleteInventoryResult
+}
+
+export async function createInventory(input: { warehouse_id: number; notes?: string }): Promise<CreateInventoryResult> {
+  const { data, error } = await supabase.rpc('rpc_create_inventory', {
+    p_warehouse_id: input.warehouse_id,
+    p_notes: input.notes ?? null,
+    p_user_id: null,
+  })
+  if (error) throw error
+  const res = data as CreateInventoryResult
+  if (!res?.success) throw new Error(res?.error || 'Не вдалося створити інвентаризацію')
+  return res
+}
+
+export async function fetchInventoryDetail(inventoryId: string): Promise<InventoryDetail> {
+  const { data, error } = await supabase.rpc('rpc_inventory_detail', { p_inventory_id: inventoryId })
+  if (error) throw error
+  const res = data as InventoryDetail
+  if (!res?.success) throw new Error(res?.error || 'Не вдалося завантажити')
+  return res
+}
+
+export async function setInventoryActual(itemId: string, actual: number, notes?: string): Promise<SetActualResult> {
+  const { data, error } = await supabase.rpc('rpc_inventory_set_actual', {
+    p_item_id: itemId,
+    p_actual_quantity: actual,
+    p_notes: notes ?? null,
+  })
+  if (error) throw error
+  const res = data as SetActualResult
+  if (!res?.success) throw new Error(res?.error || 'Не вдалося оновити')
+  return res
+}
+
+export async function addInventoryProduct(inventoryId: string, productId: number, actual: number): Promise<AddProductResult> {
+  const { data, error } = await supabase.rpc('rpc_inventory_add_product', {
+    p_inventory_id: inventoryId,
+    p_product_id: productId,
+    p_actual_quantity: actual,
+  })
+  if (error) throw error
+  const res = data as AddProductResult
+  if (!res?.success) throw new Error(res?.error || 'Не вдалося додати товар')
+  return res
+}
+
+export async function inventoryResort(input: {
+  inventory_id: string; from_product_id: number; to_product_id: number; quantity: number; notes?: string
+}): Promise<ResortResult> {
+  const { data, error } = await supabase.rpc('rpc_inventory_resort', {
+    p_inventory_id: input.inventory_id,
+    p_from_product_id: input.from_product_id,
+    p_to_product_id: input.to_product_id,
+    p_quantity: input.quantity,
+    p_notes: input.notes ?? null,
+  })
+  if (error) throw error
+  const res = data as ResortResult
+  if (!res?.success) throw new Error(res?.error || 'Не вдалося зробити пересорт')
+  return res
+}
+
+export async function cancelInventory(inventoryId: string): Promise<{ success: boolean; error?: string }> {
+  const { data, error } = await supabase.rpc('rpc_inventory_cancel', { p_inventory_id: inventoryId })
+  if (error) throw error
+  const res = data as { success: boolean; error?: string }
+  if (!res?.success) throw new Error(res?.error || 'Не вдалося скасувати')
+  return res
 }
 
 // ============================================================================

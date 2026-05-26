@@ -1,42 +1,39 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { completeInventory } from '@/lib/api'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { useDialog } from '@/components/DialogProvider'
-import { ClipboardList, CheckCircle } from 'lucide-react'
+import { ClipboardList, Plus, ChevronRight } from 'lucide-react'
+
+interface InventoryRow {
+  id: string
+  inventory_number: string
+  status: 'draft' | 'in_progress' | 'completed' | 'cancelled'
+  notes: string | null
+  created_at: string
+  completed_at: string | null
+  warehouse: { name: string } | null
+}
 
 export default function InventoryPage() {
-  const dialog = useDialog()
-  const [items, setItems] = useState<any[]>([])
+  const router = useRouter()
+  const [items, setItems] = useState<InventoryRow[]>([])
   const [loading, setLoading] = useState(true)
 
-  const load = () => {
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    supabase.from('inventories').select('*, warehouse:warehouse_id(name)')
-      .order('created_at', { ascending: false }).then(r => {
-        setItems(r.data || [])
-        setLoading(false)
-      })
-  }
-
-  useEffect(() => { load() }, [])
-
-  const handleComplete = async (id: string) => {
-    if (!(await dialog.confirm('Залишки будуть скориговані за результатами інвентаризації.', {
-      title: 'Завершити інвентаризацію?',
-      confirmText: 'Завершити',
-    }))) return
-    try {
-      const res = await completeInventory(id)
-      setItems(prev => prev.map(i =>
-        i.id === id ? { ...i, status: res.status, completed_at: res.completed_at } : i
-      ))
-    } catch (e) {
-      console.error(e)
-      await dialog.alert('Не вдалося завершити інвентаризацію.', { tone: 'error' })
-    }
-  }
+    ;(async () => {
+      const r = await supabase.from('inventories')
+        .select('id, inventory_number, status, notes, created_at, completed_at, warehouse:warehouse_id(name)')
+        .order('created_at', { ascending: false })
+      if (cancelled) return
+      setItems((r.data || []) as unknown as InventoryRow[])
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const statusColors: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-600',
@@ -52,7 +49,15 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Інвентаризація</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Інвентаризація</h1>
+        <Link href="/inventory/new"
+          className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4" /> Нова інвентаризація
+        </Link>
+      </div>
+
       {loading ? <p className="text-gray-500">Завантаження...</p> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
@@ -68,8 +73,11 @@ export default function InventoryPage() {
             </thead>
             <tbody>
               {items.map(i => (
-                <tr key={i.id} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{i.inventory_number}</td>
+                <tr key={i.id}
+                  onClick={() => router.push(`/inventory/${i.id}`)}
+                  className="border-t hover:bg-gray-50 cursor-pointer"
+                >
+                  <td className="px-4 py-3 font-medium text-blue-600">{i.inventory_number}</td>
                   <td className="px-4 py-3">{i.warehouse?.name}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[i.status]}`}>
@@ -78,12 +86,8 @@ export default function InventoryPage() {
                   </td>
                   <td className="px-4 py-3 text-right text-gray-500">{new Date(i.created_at).toLocaleString('uk-UA')}</td>
                   <td className="px-4 py-3 text-right text-gray-500">{i.completed_at ? new Date(i.completed_at).toLocaleString('uk-UA') : '—'}</td>
-                  <td className="px-4 py-3 text-right">
-                    {i.status === 'in_progress' && (
-                      <button onClick={() => handleComplete(i.id)} className="text-green-600 hover:text-green-800">
-                        <CheckCircle className="w-5 h-5" />
-                      </button>
-                    )}
+                  <td className="px-4 py-3 text-right text-gray-400">
+                    <ChevronRight className="w-4 h-4 inline" />
                   </td>
                 </tr>
               ))}
@@ -93,6 +97,7 @@ export default function InventoryPage() {
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
               <ClipboardList className="w-12 h-12 mb-2" />
               <p>Інвентаризацій поки що немає</p>
+              <Link href="/inventory/new" className="text-blue-600 hover:underline text-sm mt-2">Створити першу</Link>
             </div>
           )}
         </div>
