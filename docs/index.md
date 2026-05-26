@@ -93,5 +93,5 @@ warehouse-crm/
 - **Безпека**: Telegram webhook → `service_role` (RLS bypass), захищений `secret_token`, rate limiting (500ms/user)
 - **Аудит**: тотальне логування всіх INSERT/UPDATE/DELETE через тригери
 - **Схема**: `household_chemicals` — вимагає `ALTER ROLE authenticator SET pgrst.db_schemas TO 'public, household_chemicals'`
-- **Webhook secret token**: `63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c`
+- **Webhook secret token**: `<redacted>`
 - **Потрійне дублювання міграцій**: `warehouse-crm/` (git) + `supabase/migrations/household/` (Supabase Studio) + `supabase/migrations/` (альтернативний шлях)

@@ -9,7 +9,7 @@ info:
     ## Authentication
     - **anon key** (фронтенд): `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...`
     - **service_role key** (Telegram webhook): `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...`
-    - **Telegram webhook secret token**: `63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c`
+    - **Telegram webhook secret token**: `<redacted>`
 
     ## Schema
     Всі таблиці та RPC знаходяться в схемі `household_chemicals`.
@@ -47,7 +47,7 @@ paths:
           required: true
           schema:
             type: string
-            example: 63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c
+            example: <redacted>
           description: Секретний токен для верифікації Telegram webhook
       requestBody:
         required: true

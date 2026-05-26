@@ -95,7 +95,6 @@ export interface Product {
 export interface Warehouse {
   id: number
   name: string
-  type: string
   warehouse_type: 'shop' | 'workshop' | 'storage' | 'other' | null
   parent_shop_id: number | null
   poster_storage_id: number | null

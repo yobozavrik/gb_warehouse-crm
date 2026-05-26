@@ -12,9 +12,9 @@
 - All pages use dynamic routes with sidebar navigation
 - UI language: Ukrainian
 - Chart library: recharts installed
-- Poster API token: `526379:9669514747b2a48f329dac43b6997c42`
-- Telegram bot token: `8927414072:AAEH1WSyXia2TqWsnYXwSY0UsT_6aKtxMXE`
-- Webhook secret token: `63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c`
+- Poster API token: `<redacted>`
+- Telegram bot token: `<redacted>`
+- Webhook secret token: `<redacted>`
 
 ## Progress
 ### Done
@@ -59,7 +59,7 @@
 ### Blocked
 - **Telegram webhook URL not set** — was incorrectly set to `operator-v2-2.vercel.app`, then deleted; project is in local development (port 3001), needs public URL or tunnel to receive Telegram updates. **Must configure with `secret_token`**:
   ```bash
-  curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>/api/telegram/webhook -F "secret_token=63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c"
+  curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>/api/telegram/webhook -F "secret_token=<redacted>"
   ```
 - **14 цехів/складів (id 25–38) без `parent_shop_id`** — потрібно заповнити вручну UPDATE-ами
 - **Тестування Telegram бота** — /setup → заповнити профіль → /order
@@ -85,11 +85,11 @@
 4. **Далі**: списання, переміщення між складами, сторінка замовлень, адмінка редагування прив'язок
 
 ## Critical Context
-- Supabase anon key: `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2MzI0OTcwMCwiZXhwIjo0OTE4OTIzMzAwLCJyb2xlIjoiYW5vbiJ9.PJ-feVraUpYtvUWqDYrNGafyNRRqCSCM35tAVQCrztw`
-- Service role key: `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2MzI0OTcwMCwiZXhwIjo0OTE4OTIzMzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.QC9C9-CxocHb-jM-lHmXHEjEZV2hCOaSwgfxKLjKoEQ`
-- Poster API token: `526379:9669514747b2a48f329dac43b6997c42`
-- Telegram bot token: `8927414072:AAEH1WSyXia2TqWsnYXwSY0UsT_6aKtxMXE`
-- Webhook secret token: `63cf9308835af505ed26ade2cb0cf6dd741924d0f7227beb93a6a252e221795c`
+- Supabase anon key: `<redacted>`
+- Service role key: `<redacted>`
+- Poster API token: `<redacted>`
+- Telegram bot token: `<redacted>`
+- Webhook secret token: `<redacted>`
 - `household_chemicals` schema must be added to PostgREST `db_schemas` for `Accept-Profile` header to work
 - Dev server runs on port 3001 (port 3000 busy)
 - WEBHOOK NOT SET — Telegram has 25+ pending updates queued from previous wrong webhook

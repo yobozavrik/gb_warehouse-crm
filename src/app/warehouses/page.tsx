@@ -34,6 +34,7 @@ const TYPE_LABELS: Record<string, string> = {
   workshop: 'Цех',
   storage: 'Склад',
   other: 'Інше',
+  '': '—',
 }
 
 export default function WarehousesPage() {
@@ -102,16 +103,16 @@ export default function WarehousesPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      wh.type === 'central' ? 'bg-purple-100' : 'bg-blue-100'
+                      wh.warehouse_type === 'storage' ? 'bg-purple-100' : 'bg-blue-100'
                     }`}>
                       <WarehouseIcon className={`w-4 h-4 ${
-                        wh.type === 'central' ? 'text-purple-600' : 'text-blue-600'
+                        wh.warehouse_type === 'storage' ? 'text-purple-600' : 'text-blue-600'
                       }`} />
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">{wh.name}</h3>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {TYPE_LABELS[wh.type] || wh.type}
+                        {TYPE_LABELS[wh.warehouse_type ?? ''] || wh.warehouse_type}
                         {wh.address && ` — ${wh.address}`}
                       </p>
                     </div>
