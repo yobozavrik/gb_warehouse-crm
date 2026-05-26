@@ -713,9 +713,14 @@ function getSigWords(text: string): string[] {
 
 function stemsMatch(sWord: string, pWord: string): boolean {
   if (sWord === pWord) return true
+  // Substring check (handles compound words: "пальчик" in "мініпальчик")
+  if (sWord.length >= 3 && pWord.length >= 3) {
+    if (sWord.includes(pWord) || pWord.includes(sWord)) return true
+  }
+  // Prefix matching for words >=5 chars
   if (sWord.length <= 4 || pWord.length <= 4) return false
   const maxLen = Math.min(sWord.length, pWord.length)
-  for (let i = maxLen; i > 4; i--) {
+  for (let i = maxLen; i > 3; i--) {
     if (sWord.slice(0, i) === pWord.slice(0, i)) return true
   }
   return false
