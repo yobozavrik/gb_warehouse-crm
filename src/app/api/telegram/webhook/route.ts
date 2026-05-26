@@ -735,10 +735,13 @@ function wordPrefix(word: string): string {
 }
 
 // Cache IDF data per session
-let idfCache: { wordsList: Set<string>[]; prefixCount: Record<string, number> } | null = null
+let idfCache: { wordsList: Set<string>[]; prefixCount: Record<string, number>; key: string } | null = null
 
 function buildIdfCache(products: any[]): { wordsList: Set<string>[]; prefixCount: Record<string, number> } {
-  if (idfCache) return idfCache
+  const key = products.length
+    ? `${products.length}:${products[0]?.id}:${products[products.length - 1]?.id}`
+    : ''
+  if (idfCache && idfCache.key === key) return idfCache
   const prefixCount: Record<string, number> = {}
   const wordsList: Set<string>[] = []
   for (const p of products) {
@@ -760,7 +763,7 @@ function buildIdfCache(products: any[]): { wordsList: Set<string>[]; prefixCount
       prefixCount[pref] = Math.max(prefixCount[pref], 5)
     }
   }
-  idfCache = { wordsList, prefixCount }
+  idfCache = { wordsList, prefixCount, key }
   return idfCache
 }
 
