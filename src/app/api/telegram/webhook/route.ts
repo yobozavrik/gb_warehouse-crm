@@ -673,76 +673,262 @@ export async function POST(req: NextRequest) {
 }
 
 // ============================================================================
-// GROUP CHAT ORDER PARSING
+// GROUP CHAT ORDER PARSING — improved with prefix matching, IDF scoring, abbrev
 // ============================================================================
-async function findProductMatches(supabase: SupabaseClient, text: string): Promise<any[]> {
-  const { data: products } = await supabase
-    .from('products')
-    .select('id, name, sku, unit')
-    .eq('is_active', true)
-  if (!products) return []
 
-  const textLower = text.toLowerCase()
-  const matches: any[] = []
+const STOP_WORDS = new Set(['на', 'для', 'по', 'при', 'з', 'до', 'у', 'в', 'та', 'за', 'від', 'із',
+  'під', 'над', 'про', 'без', 'через', 'після', 'перед', 'й', 'а', 'і', 'але', 'ні', 'чи'])
+const ABBREV_MAP: Record<string, string> = {
+  'ст': 'стор', 'шт': 'штук', 'уп': 'упак', 'ящ': 'ящик',
+  'пач': 'пачк', 'кг': 'кілог', 'мл': 'мілілітр',
+  'грн': 'гривн',
+}
+const ALLOWED_SINGLE = new Set(['s', 'm', 'l', 'x'])
 
-  for (const p of products) {
-    const nameLower = p.name?.toLowerCase() || ''
-    const skuLower = p.sku?.toLowerCase() || ''
-    const words = nameLower.split(/[\s,]+/).filter((w: string) => w.length > 2)
-
-    // Перевіряємо чи є назва товару (або ключове слово) в тексті
-    const found = words.some((w: string) => textLower.includes(w)) ||
-      (skuLower && textLower.includes(skuLower)) ||
-      textLower.includes(nameLower)
-
-    if (found) matches.push(p)
+function expandAbbrevs(text: string): string {
+  let result = text.toLowerCase()
+  for (const [short, full] of Object.entries(ABBREV_MAP)) {
+    result = result.replace(new RegExp(`\\b${short}\\b`, 'g'), full)
   }
-  return matches
+  return result
 }
 
-function extractQuantities(text: string, productName: string): number[] {
-  const textLower = text.toLowerCase()
-  const nameLower = productName.toLowerCase()
-  const quantities: number[] = []
-
-  // Патерн: "10 шт Назва" або "10 Назва"
-  const beforeRegex = new RegExp(`(\\d+[\\.,]?\\d*)\\s*(?:шт|пач|кг|л|г|мл)?\\s*${escapeRegex(nameLower)}`, 'i')
-  const beforeMatch = textLower.match(beforeRegex)
-  if (beforeMatch) quantities.push(parseFloat(beforeMatch[1].replace(',', '.')))
-
-  // Патерн: "Назва 10 шт" або "Назва 10"
-  const afterRegex = new RegExp(`${escapeRegex(nameLower)}\\s*(?:[-,]\\s*)?(\\d+[\\.,]?\\d*)\\s*(?:шт|пач|кг|л|г|мл)?`, 'i')
-  const afterMatch = textLower.match(afterRegex)
-  if (afterMatch) quantities.push(parseFloat(afterMatch[1].replace(',', '.')))
-
-  return quantities
+function getSigWords(text: string): string[] {
+  const expanded = expandAbbrevs(text)
+  const words = [...expanded.matchAll(/[а-яіїєґa-z]+/g)].map(m => m[0])
+  const digitLetter = [...expanded.matchAll(/\d+[а-яіїєґa-z]/g)].map(m => m[0])
+  const numbers = [...expanded.matchAll(/\b(\d+)\b/g)].map(m => m[1])
+  const result: string[] = []
+  for (const w of words) {
+    if (ALLOWED_SINGLE.has(w)) {
+      result.push(w)
+    } else if (w.length >= 3 && !STOP_WORDS.has(w)) {
+      result.push(w)
+    }
+  }
+  result.push(...digitLetter)
+  result.push(...numbers)
+  return result
 }
 
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+function stemsMatch(sWord: string, pWord: string): boolean {
+  if (sWord === pWord) return true
+  if (sWord.length <= 4 || pWord.length <= 4) return false
+  const maxLen = Math.min(sWord.length, pWord.length)
+  for (let i = maxLen; i > 4; i--) {
+    if (sWord.slice(0, i) === pWord.slice(0, i)) return true
+  }
+  return false
+}
+
+function wordPrefix(word: string): string {
+  if (/^\d+$/.test(word) || /^\d+[а-яіїєґa-z]$/.test(word)) return word
+  return word.slice(0, 5)
+}
+
+// Cache IDF data per session
+let idfCache: { wordsList: Set<string>[]; prefixCount: Record<string, number> } | null = null
+
+function buildIdfCache(products: any[]): { wordsList: Set<string>[]; prefixCount: Record<string, number> } {
+  if (idfCache) return idfCache
+  const prefixCount: Record<string, number> = {}
+  const wordsList: Set<string>[] = []
+  for (const p of products) {
+    const name = (p.name || '').toLowerCase()
+    const sig = getSigWords(name)
+    const wordSet = new Set(sig)
+    wordsList.push(wordSet)
+    const seen = new Set<string>()
+    for (const w of wordSet) {
+      const pref = wordPrefix(w)
+      if (!seen.has(pref)) {
+        prefixCount[pref] = (prefixCount[pref] || 0) + 1
+        seen.add(pref)
+      }
+    }
+  }
+  for (const pref of Object.keys(prefixCount)) {
+    if (/^\d+$/.test(pref)) {
+      prefixCount[pref] = Math.max(prefixCount[pref], 5)
+    }
+  }
+  idfCache = { wordsList, prefixCount }
+  return idfCache
+}
+
+function extractQty(line: string): number | null {
+  const lower = line.toLowerCase()
+  const parts = lower.split(/[\s,;]+/)
+
+  // Last number with unit
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const m = parts[i].match(/^(\d+[\.,]?\d*)\s*(шт|уп|ящ|кг|л|мл|пач|грн)?$/)
+    if (m) {
+      const unit = m[2] || ''
+      if (unit === 'л' && !m[1].includes('.') && m[1].length <= 2) continue
+      return parseFloat(m[1].replace(',', '.'))
+    }
+  }
+
+  // Number at start: "4 уп рукавичок"
+  const startMatch = lower.match(/^(\d+[\.,]?\d*)\s+(шт|уп|ящ|кг|л|мл|пач|грн)?\s+/)
+  if (startMatch) return parseFloat(startMatch[1].replace(',', '.'))
+
+  // Number at end: "Грасаторе 1"
+  const endMatch = lower.match(/(\d+[\.,]?\d*)\s*$/)
+  if (endMatch) {
+    const before = lower.slice(0, endMatch.index).trim()
+    if (!['на', 'по', 'для'].some(w => before.endsWith(w))) {
+      return parseFloat(endMatch[1].replace(',', '.'))
+    }
+  }
+
+  return null
+}
+
+function removeQtyFromText(line: string, qty: number | null): string {
+  if (qty === null) return line.trim()
+  let text = line.toLowerCase()
+  const qtyStr = Number.isInteger(qty) ? String(qty) : String(qty)
+  text = text.replace(new RegExp(`\\b${qtyStr}\\s*(шт|уп|ящ|кг|л|мл|пач|грн)?`), '')
+  text = text.replace(new RegExp(`(шт|уп|ящ|кг|л|мл|пач|грн)?\\s*${qtyStr}`), '')
+  return text.replace(/[-\s,;:.()]+/g, ' ').trim()
+}
+
+function matchProduct(searchText: string, products: any[], wordsList: Set<string>[], prefixCount: Record<string, number>): any | null {
+  const sigWords = getSigWords(searchText)
+  if (!sigWords.length) return null
+
+  const N = products.length
+  let best: any = null
+  let bestScore = -1
+
+  for (let idx = 0; idx < products.length; idx++) {
+    const p = products[idx]
+    const name = (p.name || '').trim()
+    if (!name) continue
+    const prodWords = wordsList[idx]
+
+    const common: string[] = []
+    const unmatched: string[] = []
+    let totalPrefixLen = 0
+
+    for (const sw of sigWords) {
+      let matched = false
+      let bestPlen = 0
+      for (const pw of prodWords) {
+        if (stemsMatch(sw, pw)) {
+          matched = true
+          const maxLen = Math.min(sw.length, pw.length)
+          for (let plen = maxLen; plen > 4; plen--) {
+            if (sw.slice(0, plen) === pw.slice(0, plen)) {
+              bestPlen = Math.max(bestPlen, plen)
+              break
+            }
+          }
+        }
+      }
+      if (matched) {
+        common.push(sw)
+        totalPrefixLen += bestPlen
+      } else {
+        unmatched.push(sw)
+      }
+    }
+
+    if (!common.length) continue
+
+    // IDF-weighted score
+    let score = 0
+    for (const sw of common) {
+      const pref = wordPrefix(sw)
+      const df = prefixCount[pref] || 1
+      const idf = Math.sqrt(N / df)
+      score += 10 * idf
+    }
+
+    // Penalty for unmatched words (proportional to length)
+    for (const uw of unmatched) {
+      score -= Math.min(uw.length * 2, 15)
+    }
+
+    // Substring bonus
+    const searchLower = searchText.toLowerCase().trim()
+    const nameLower = name.toLowerCase()
+    if (searchLower.includes(nameLower) || nameLower.includes(searchLower)) {
+      score += 30
+    }
+
+    // All matched bonus
+    if (!unmatched.length) score += 20
+
+    // Longer prefix match bonus
+    score += totalPrefixLen * 0.5
+
+    if (score > bestScore) {
+      bestScore = score
+      best = p
+    }
+  }
+
+  if (best) return best
+
+  // Fuzzy fallback: try removing first letter
+  const searchLower = searchText.toLowerCase().trim()
+  for (const p of products) {
+    const name = (p.name || '').toLowerCase().trim()
+    if (!name) continue
+    const searchTrim = searchLower.length > 3 ? searchLower.slice(1) : ''
+    const nameTrim = name.length > 3 ? name.slice(1) : ''
+    if ((searchTrim && searchTrim === name) || (nameTrim && nameTrim === searchLower)) return p
+    if ((searchTrim && searchTrim === nameTrim) || (searchLower === nameTrim)) return p
+    if (searchTrim && name.includes(searchTrim)) return p
+  }
+
+  return null
 }
 
 async function parseGroupOrder(
   supabase: SupabaseClient, text: string, tgUserId: number,
   shopId: number, chatId: number, messageId: number
 ): Promise<{ reply: string } | null> {
-  // Знаходимо товари, які згадуються в тексті
-  const matchedProducts = await findProductMatches(supabase, text)
-  if (matchedProducts.length === 0) return null
+  // Fetch all active products
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, name, sku, unit')
+    .eq('is_active', true)
+  if (!products || !products.length) return null
 
+  const { wordsList, prefixCount } = buildIdfCache(products)
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
   const items: { product_id: number; quantity: number }[] = []
+  const matched: { prod: any; qty: number }[] = []
 
-  for (const p of matchedProducts) {
-    const qty = extractQuantities(text, p.name)
-    const quantity = qty.length > 0 ? Math.max(...qty) : 1
-    if (quantity > 0 && quantity <= 999999) {
-      items.push({ product_id: p.id, quantity })
-    }
+  for (const line of lines) {
+    // Skip greetings/thanks
+    if (/^(На |Дякую|Добрий|дякую)/i.test(line)) continue
+
+    // Remove location prefix
+    let clean = line.replace(/^(Садова|Герцена|Компас|Героїв цех|Шкільна)[\s:,.!\-]*/i, '').trim()
+    clean = clean.replace(/\.$/, '').trim()
+    if (!clean) continue
+
+    const qty = extractQty(clean) || 1
+    const searchText = qty ? removeQtyFromText(clean, qty) : clean
+    const finalSearch = searchText || removeQtyFromText(clean, null)
+
+    const product = matchProduct(finalSearch, products, wordsList, prefixCount)
+    if (!product) continue
+    if (qty <= 0 || qty > 999999) continue
+
+    items.push({ product_id: product.id, quantity: Math.round(qty) })
+    matched.push({ prod: product, qty: Math.round(qty) })
   }
 
-  if (items.length === 0) return null
+  if (!items.length) return null
 
-  // Створюємо заявку
+  // Create order via RPC
   const { data: result } = await supabase.rpc('telegram_create_order', {
     p_telegram_user_id: tgUserId,
     p_shop_id: shopId,
@@ -752,57 +938,58 @@ async function parseGroupOrder(
     p_telegram_message_id: String(messageId),
   })
   const res = result as any
-
   if (!res?.success) return null
 
-  const itemLines = items.map((i: any) => {
-    const p = matchedProducts.find((mp: any) => mp.id === i.product_id)
-    return `${i.quantity} ${p?.unit || 'шт'} ${p?.name || '?'}`
-  }).join('\n')
-
+  const replyLines = matched.map(m => `${m.qty} ${m.prod.unit || 'шт'} ${m.prod.name}`)
   return {
-    reply: `✅ Заявка ${res.order_number} створена\n\n${itemLines}\n\n/status ${res.order_number}`,
+    reply: `✅ Заявка ${res.order_number} створена\n\n${replyLines.join('\n')}\n\n/status ${res.order_number}`,
   }
 }
 
 async function handleEditedOrderMessage(
   supabase: SupabaseClient, tgUserId: number, editedMessageId: number, chatId: number, newText: string
 ): Promise<void> {
-  // Шукаємо заявку за telegram_message_id
   const { data: orders } = await supabase
     .from('orders')
     .select('id, order_number, status')
     .eq('telegram_message_id', String(editedMessageId))
     .eq('source', 'telegram')
 
-  if (!orders || orders.length === 0) return
-
+  if (!orders || !orders.length) return
   const order = orders[0]
   if (order.status === 'shipped' || order.status === 'cancelled') return
 
-  // Видаляємо старі позиції
-  const { data: oldItems } = await supabase
-    .from('order_items')
-    .select('id')
-    .eq('order_id', order.id)
+  // Delete old items
+  await supabase.from('order_items').delete().eq('order_id', order.id)
 
-  if (oldItems) {
-    for (const item of oldItems) {
-      await supabase.from('order_items').delete().eq('id', item.id)
-    }
-  }
+  // Fetch products and re-parse
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, name, sku, unit')
+    .eq('is_active', true)
+  if (!products || !products.length) return
 
-  // Парсимо новий текст і додаємо позиції
-  const matchedProducts = await findProductMatches(supabase, newText)
-  for (const p of matchedProducts) {
-    const qty = extractQuantities(newText, p.name)
-    const quantity = qty.length > 0 ? Math.max(...qty) : 1
-    if (quantity > 0 && quantity <= 999999) {
-      await supabase.from('order_items').insert({
-        order_id: order.id,
-        product_id: p.id,
-        quantity_requested: quantity,
-      })
-    }
+  const { wordsList, prefixCount } = buildIdfCache(products)
+  const lines = newText.split('\n').map(l => l.trim()).filter(Boolean)
+
+  for (const line of lines) {
+    if (/^(На |Дякую|Добрий|дякую)/i.test(line)) continue
+    let clean = line.replace(/^(Садова|Герцена|Компас|Героїв цех|Шкільна)[\s:,.!\-]*/i, '').trim()
+    clean = clean.replace(/\.$/, '').trim()
+    if (!clean) continue
+
+    const qty = extractQty(clean) || 1
+    const searchText = qty ? removeQtyFromText(clean, qty) : clean
+    const finalSearch = searchText || removeQtyFromText(clean, null)
+
+    const product = matchProduct(finalSearch, products, wordsList, prefixCount)
+    if (!product) continue
+    if (qty <= 0 || qty > 999999) continue
+
+    await supabase.from('order_items').insert({
+      order_id: order.id,
+      product_id: product.id,
+      quantity_requested: Math.round(qty),
+    })
   }
 }
