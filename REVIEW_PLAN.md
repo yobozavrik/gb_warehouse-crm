@@ -60,12 +60,12 @@
 | M12 | done          | `/status` now uses `text.slice(7).trim()`          |
 | L1  | done          | `DialogProvider` + `useDialog()` hook; all 20 `confirm()`/`alert()` calls replaced |
 | L2  | done          | `Eye` import removed from orders                   |
-| L3  | partial       | orders uses `reloadToken`; other pages still refetch |
+| L3  | done          | receipts / transfers / write-offs / inventory do local row update via JSONB result instead of full refetch |
 | L4  | done          | duplicate status triggers removed in migration 017 (H11) |
 | L6  | done          | `.env.example` rewritten for this project          |
 | L7  | done          | migration 024 — year + counter atomic via single INSERT…RETURNING |
 | L8  | done          | migration 022 — `confirm_transfer` / `confirm_write_off` notes in Ukrainian |
-| L9  | open          | `confirmReceipt` returns `void` (could return movement count) |
+| L9  | done          | migration 025 — confirm_receipt / confirm_transfer / confirm_write_off / complete_inventory return JSONB; api.ts wired with typed results |
 | L10 | done          | `tgSend` / `tgEditMenu` / `tgAnswerCallback` wrapped in try/catch (commit 41a2e1e) |
 
 ### New SQL files added in pass 2-5

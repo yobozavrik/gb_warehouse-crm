@@ -33,8 +33,10 @@ export default function WriteOffsPage() {
       confirmText: 'Підтвердити',
     }))) return
     try {
-      await confirmWriteOff(id)
-      load()
+      const res = await confirmWriteOff(id)
+      setItems(prev => prev.map(w =>
+        w.id === id ? { ...w, status: res.status, confirmed_at: res.confirmed_at } : w
+      ))
     } catch (e) {
       console.error(e)
       await dialog.alert('Не вдалося підтвердити списання.', { tone: 'error' })

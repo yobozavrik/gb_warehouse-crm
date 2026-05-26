@@ -40,8 +40,10 @@ export default function TransfersPage() {
       confirmText: 'Провести',
     }))) return
     try {
-      await confirmTransfer(id)
-      load()
+      const res = await confirmTransfer(id)
+      setTransfers(prev => prev.map(t =>
+        t.id === id ? { ...t, status: res.status, completed_at: res.completed_at } : t
+      ))
     } catch (e) {
       console.error(e)
       await dialog.alert('Не вдалося провести переміщення.', { tone: 'error' })

@@ -45,8 +45,10 @@ export default function ReceiptsPage() {
     }))) return
     setConfirming(id)
     try {
-      await confirmReceipt(id)
-      load()
+      const res = await confirmReceipt(id)
+      setReceipts(prev => prev.map(r =>
+        r.id === id ? { ...r, status: res.status, confirmed_at: res.confirmed_at } : r
+      ))
     } catch (err) {
       console.error(err)
       await dialog.alert('Не вдалося підтвердити прихід.', { tone: 'error' })

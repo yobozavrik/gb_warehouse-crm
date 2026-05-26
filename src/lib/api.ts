@@ -1,5 +1,5 @@
 ﻿import { supabase } from './supabase'
-import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail, StockSummaryItem, CriticalStockItem, StockMovementItem, OrderListItem, OrderDetailResponse, RpcResult, ReceiptDetailResponse, ReceiptListItem } from './types'
+import type { DashboardSummary, PaginatedResponse, Product, ProductCategory, Warehouse, Shop, Supplier, SupplierPayment, SupplierWithStats, StockBalance, ProductDetail, CategoryGroup, CategoryWithSuppliers, SupplierDetail, StockSummaryItem, CriticalStockItem, StockMovementItem, OrderListItem, OrderDetailResponse, RpcResult, ReceiptDetailResponse, ReceiptListItem, ConfirmReceiptResult, ConfirmTransferResult, ConfirmWriteOffResult, CompleteInventoryResult } from './types'
 
 // ============================================================================
 // DASHBOARD
@@ -282,12 +282,13 @@ export async function createReceiptWithItems(input: {
   return { receipt_id: res.receipt_id, receipt_number: res.receipt_number, items_inserted: res.items_inserted }
 }
 
-export async function confirmReceipt(receiptId: string): Promise<void> {
-  const { error } = await supabase.rpc('confirm_receipt', {
+export async function confirmReceipt(receiptId: string): Promise<ConfirmReceiptResult> {
+  const { data, error } = await supabase.rpc('confirm_receipt', {
     p_receipt_id: receiptId,
     p_user_id: null,
   })
   if (error) throw error
+  return data as ConfirmReceiptResult
 }
 
 // ============================================================================
@@ -367,28 +368,31 @@ export async function confirmOrder(orderId: string): Promise<RpcResult> {
 // ============================================================================
 // TRANSFERS / WRITE-OFFS / INVENTORY
 // ============================================================================
-export async function confirmTransfer(transferId: string): Promise<void> {
-  const { error } = await supabase.rpc('confirm_transfer', {
+export async function confirmTransfer(transferId: string): Promise<ConfirmTransferResult> {
+  const { data, error } = await supabase.rpc('confirm_transfer', {
     p_transfer_id: transferId,
     p_user_id: null,
   })
   if (error) throw error
+  return data as ConfirmTransferResult
 }
 
-export async function confirmWriteOff(writeOffId: string): Promise<void> {
-  const { error } = await supabase.rpc('confirm_write_off', {
+export async function confirmWriteOff(writeOffId: string): Promise<ConfirmWriteOffResult> {
+  const { data, error } = await supabase.rpc('confirm_write_off', {
     p_write_off_id: writeOffId,
     p_user_id: null,
   })
   if (error) throw error
+  return data as ConfirmWriteOffResult
 }
 
-export async function completeInventory(inventoryId: string): Promise<void> {
-  const { error } = await supabase.rpc('complete_inventory', {
+export async function completeInventory(inventoryId: string): Promise<CompleteInventoryResult> {
+  const { data, error } = await supabase.rpc('complete_inventory', {
     p_inventory_id: inventoryId,
     p_user_id: null,
   })
   if (error) throw error
+  return data as CompleteInventoryResult
 }
 
 // ============================================================================

@@ -28,8 +28,10 @@ export default function InventoryPage() {
       confirmText: 'Завершити',
     }))) return
     try {
-      await completeInventory(id)
-      load()
+      const res = await completeInventory(id)
+      setItems(prev => prev.map(i =>
+        i.id === id ? { ...i, status: res.status, completed_at: res.completed_at } : i
+      ))
     } catch (e) {
       console.error(e)
       await dialog.alert('Не вдалося завершити інвентаризацію.', { tone: 'error' })

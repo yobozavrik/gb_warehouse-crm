@@ -464,3 +464,35 @@ export interface ReceiptDetailResponse {
   items: ReceiptItemWithProduct[]
   total: number
 }
+
+export interface ConfirmReceiptResult {
+  success: boolean
+  receipt_id: string
+  status: 'confirmed'
+  confirmed_at: string
+  movements_created: number
+}
+
+export interface ConfirmTransferResult {
+  success: boolean
+  transfer_id: string
+  status: 'completed'
+  completed_at: string
+  movements_created: number
+}
+
+export interface ConfirmWriteOffResult {
+  success: boolean
+  write_off_id: string
+  status: 'confirmed'
+  confirmed_at: string
+  movements_created: number
+}
+
+export interface CompleteInventoryResult {
+  success: boolean
+  inventory_id: string
+  status: 'completed'
+  completed_at: string
+  corrections_applied: number
+}
