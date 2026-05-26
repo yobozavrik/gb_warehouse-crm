@@ -18,8 +18,8 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    label: 'Товари',
-    href: '/products',
+    label: 'Склад',
+    href: '/stock',
     icon: Package,
   },
   {
@@ -59,6 +59,7 @@ const navItems = [
     label: 'Довідники',
     icon: Boxes,
     children: [
+      { label: 'Товари', href: '/products', icon: Package },
       { label: 'Склади', href: '/warehouses', icon: Warehouse },
       { label: 'Магазини', href: '/shops', icon: Store },
     ],
