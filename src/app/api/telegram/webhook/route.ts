@@ -231,12 +231,12 @@ async function cancelOrder(supabase: SupabaseClient, chatId: number, messageId: 
 
 async function startOnboarding(supabase: SupabaseClient, chatId: number, tgUserId: number) {
   await supabase.from('telegram_pending_orders').upsert({
-    telegram_user_id: tgUserId, chat_id: chatId, step: 'onboarding_name', items: [],
+    telegram_user_id: tgUserId, chat_id: chatId, step: 'onboarding_name', shop_id: null, items: [],
   }, { onConflict: 'telegram_user_id, chat_id', ignoreDuplicates: false })
   await tgSend(chatId,
     'Ласкаво просимо!\n\n'
-    + 'Для роботи потрiбно заповнити профiль.\n\n'
-    + 'Крок 1 з 3: Введiть ваше прiзвище та iм`я.\n'
+    + 'Для роботи з ботом потрібно заповнити профіль.\n\n'
+    + 'Крок 1 з 3. Введіть ваше прізвище та ім’я.\n'
     + 'Наприклад: Петренко Олена'
   )
 }
@@ -312,9 +312,41 @@ export async function POST(req: NextRequest) {
 
     // ---- CALLBACK QUERIES ----
     if (isCallback && data) {
-      if (data === 'onboard:skip_phone') {
+      if (data === 'onboard:confirm') {
+        const { data: pendingRow } = await supabase
+          .from('telegram_pending_orders')
+          .select('items')
+          .eq('telegram_user_id', tgUserId)
+          .eq('chat_id', chatId)
+          .maybeSingle()
+        const buf = (safeItems(pendingRow?.items)[0] as any) || {}
+        if (!buf.display_name || !buf.shop_id || !buf.phone) {
+          await tgEditMenu(chatId, messageId, 'Помилка: дані неповні. Почніть знову через /setup.', [])
+          return NextResponse.json({ ok: true })
+        }
+        await supabase.from('telegram_users').update({
+          display_name: buf.display_name,
+          shop_id: buf.shop_id,
+          phone: buf.phone,
+        }).eq('id', tgUserId)
         await supabase.from('telegram_pending_orders').delete().eq('telegram_user_id', tgUserId).eq('chat_id', chatId)
-        await tgEditMenu(chatId, messageId, 'Реєстрацiя завершена! Тепер /order для замовлення.', [])
+        await tgEditMenu(chatId, messageId,
+          'Реєстрацію завершено!\n\nТепер ваші заявки з робочого чату будуть автоматично потрапляти у CRM.',
+          []
+        )
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'onboard:edit') {
+        await supabase.from('telegram_pending_orders').update({
+          step: 'onboarding_name',
+          shop_id: null,
+          items: [],
+        }).eq('telegram_user_id', tgUserId).eq('chat_id', chatId)
+        await tgEditMenu(chatId, messageId,
+          'Починаємо заново.\n\nКрок 1 з 3. Введіть ваше прізвище та ім’я.\nНаприклад: Петренко Олена',
+          []
+        )
         return NextResponse.json({ ok: true })
       }
 
@@ -347,14 +379,23 @@ export async function POST(req: NextRequest) {
 
       if (prefix === 'onboard' && action === 'shop') {
         const shopId = safeInt(parts[2])
-        await supabase.from('telegram_users').update({ shop_id: shopId }).eq('id', tgUserId)
-        await supabase.from('telegram_pending_orders').update({ step: 'onboarding_phone', shop_id: shopId }).eq('telegram_user_id', tgUserId).eq('chat_id', chatId)
+        const { data: pendingRow } = await supabase
+          .from('telegram_pending_orders')
+          .select('items')
+          .eq('telegram_user_id', tgUserId)
+          .eq('chat_id', chatId)
+          .maybeSingle()
+        const buf = (safeItems(pendingRow?.items)[0] as any) || {}
+        await supabase.from('telegram_pending_orders').update({
+          step: 'onboarding_phone',
+          items: [{ ...buf, shop_id: shopId }],
+        }).eq('telegram_user_id', tgUserId).eq('chat_id', chatId)
         const { data: shop } = await supabase.from('shops').select('name').eq('id', shopId).single()
         await tgEditMenu(chatId, messageId,
-          `Магазин: ${safeHTML(shop?.name || '?')}\n\n`
-          + 'Крок 3 з 3: Введiть ваш номер телефону (необов`язково).\n'
-          + 'Або натиснiть Пропустити.',
-          [[{ text: 'Пропустити', callback_data: 'onboard:skip_phone' }]]
+          `Магазин/цех/склад: ${safeHTML(shop?.name || '?')}\n\n`
+          + 'Крок 3 з 3. Введіть ваш номер телефону.\n'
+          + 'Наприклад: +380501234567',
+          []
         )
         return NextResponse.json({ ok: true })
       }
@@ -472,34 +513,59 @@ export async function POST(req: NextRequest) {
         .eq('chat_id', chatId)
         .maybeSingle()
 
-      // Onboarding: user enters name
+      // Onboarding step 1 → 2: зберігаємо ім'я у буфер pending.items
       if (pending?.step === 'onboarding_name' && text.length > 0 && !text.startsWith('/')) {
         const displayName = safeText(text, 200)
-        await tgSend(chatId, 'Iм`я збережено: ' + displayName)
-        await supabase.from('telegram_users').update({ display_name: displayName }).eq('id', tgUserId)
-        await supabase.from('telegram_pending_orders').update({ step: 'onboarding_shop' }).eq('id', pending.id)
-        const { data: shopsRaw } = await supabase.rpc('rpc_shops_with_stats', { p_days: 365 })
+        await supabase.from('telegram_pending_orders').update({
+          step: 'onboarding_shop',
+          items: [{ display_name: displayName }],
+        }).eq('id', pending.id)
+        const { data: shopsRaw } = await supabase
+          .from('shops')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name', { ascending: true })
         const shops = (shopsRaw as any[]) || []
         const buttons = shops.map(s => [{ text: safeHTML(s.name), callback_data: `onboard:shop:${s.id}` }])
-        await tgSendMenu(chatId, 'Оберiть ваш магазин або цех:', buttons)
+        await tgSendMenu(chatId,
+          `Ім’я: ${safeHTML(displayName)}\n\nКрок 2 з 3. Оберіть ваш магазин / цех / склад:`,
+          buttons
+        )
         return NextResponse.json({ ok: true })
       }
 
-      // Onboarding: user enters phone
+      // Onboarding step 3 → confirm: записуємо телефон у буфер, показуємо зведення
       if (pending?.step === 'onboarding_phone' && text.length > 0 && !text.startsWith('/')) {
         const phone = safeText(text, 30)
         if (!/^[\d\s\-\+\(\)\.]{6,30}$/.test(phone)) {
-          await tgSend(chatId, 'Введiть коректний номер телефону (тiльки цифри, +, -, пробiли)')
+          await tgSend(chatId, 'Введіть коректний номер телефону. Наприклад: +380501234567')
           return NextResponse.json({ ok: true })
         }
-        await supabase.from('telegram_users').update({ phone }).eq('id', tgUserId)
-        await supabase.from('telegram_pending_orders').delete().eq('id', pending.id)
-        await tgSend(chatId, 'Реєстрацiя завершена! Тепер /order для замовлення.')
+        const buf = (safeItems(pending.items)[0] as any) || {}
+        const newBuf = { ...buf, phone }
+        await supabase.from('telegram_pending_orders').update({
+          step: 'onboarding_confirm',
+          items: [newBuf],
+        }).eq('id', pending.id)
+        const { data: shop } = newBuf.shop_id
+          ? await supabase.from('shops').select('name').eq('id', newBuf.shop_id).single()
+          : { data: null }
+        await tgSendMenu(chatId,
+          `Перевірте ваші дані:\n\n`
+          + `Прізвище та ім’я: ${safeHTML(newBuf.display_name || '?')}\n`
+          + `Магазин / цех / склад: ${safeHTML(shop?.name || '?')}\n`
+          + `Телефон: ${safeHTML(phone)}\n\n`
+          + 'Все правильно?',
+          [
+            [{ text: '✅ Підтвердити', callback_data: 'onboard:confirm' }],
+            [{ text: '✏️ Редагувати', callback_data: 'onboard:edit' }],
+          ]
+        )
         return NextResponse.json({ ok: true })
       }
 
       // Custom quantity for order
-      if (pending && !['onboarding_name', 'onboarding_phone'].includes(pending.step)) {
+      if (pending && !pending.step?.startsWith('onboarding_')) {
         const items = safeItems(pending.items)
         const customItem = items.find((i: any) => i._custom)
         if (customItem && text.length > 0) {
@@ -527,36 +593,50 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Auto-onboarding for new users
-      if (!tgUserData.display_name && !text.startsWith('/')) {
+      // Auto-onboarding for new users — лише у особистих повідомленнях
+      if (!tgUserData.display_name && !text.startsWith('/') && chatId > 0) {
         await startOnboarding(supabase, chatId, tgUserId)
         return NextResponse.json({ ok: true })
       }
-      if (tgUserData.display_name && !tgUserData.shop_id && !text.startsWith('/')) {
+      if (tgUserData.display_name && !tgUserData.shop_id && !text.startsWith('/') && chatId > 0) {
         await supabase.from('telegram_pending_orders').upsert({
-          telegram_user_id: tgUserId, chat_id: chatId, step: 'onboarding_shop', items: [],
+          telegram_user_id: tgUserId, chat_id: chatId, step: 'onboarding_shop',
+          items: [{ display_name: tgUserData.display_name }],
         }, { onConflict: 'telegram_user_id, chat_id', ignoreDuplicates: false })
-        const { data: shopsRaw } = await supabase.rpc('rpc_shops_with_stats', { p_days: 365 })
+        const { data: shopsRaw } = await supabase
+          .from('shops')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name', { ascending: true })
         const shops = (shopsRaw as any[]) || []
         const buttons = shops.map(s => [{ text: safeHTML(s.name), callback_data: `onboard:shop:${s.id}` }])
-        await tgSendMenu(chatId, 'Оберiть ваш магазин або цех:', buttons)
+        await tgSendMenu(chatId,
+          `Ім’я: ${safeHTML(tgUserData.display_name)}\n\nКрок 2 з 3. Оберіть ваш магазин / цех / склад:`,
+          buttons
+        )
         return NextResponse.json({ ok: true })
       }
 
       // Commands
       if (text === '/start') {
+        if (chatId < 0) {
+          await tgSend(chatId,
+            'Для реєстрації напишіть мені в особистих: @gb_household_chemicals_bot та надішліть /start.'
+          )
+          return NextResponse.json({ ok: true })
+        }
         if (!tgUserData.display_name || !tgUserData.shop_id) {
           await supabase.from('telegram_pending_orders').delete().eq('telegram_user_id', tgUserId).eq('chat_id', chatId)
           await startOnboarding(supabase, chatId, tgUserId)
         } else {
           await tgSend(chatId,
-            'Бот для замовлення товарiв зi складу.\n\n'
+            'Бот для замовлення товарів зі складу.\n\n'
             + '/order - зробити замовлення\n'
             + '/catalog - каталог\n'
             + '/status - статус заявки\n'
-            + '/myshop - мiй магазин\n'
-            + '/whoami - моi данi\n'
-            + '/setup - перезаповнити профiль\n'
+            + '/myshop - мій магазин\n'
+            + '/whoami - мої дані\n'
+            + '/setup - перезаповнити профіль\n'
             + '/cancel - скасувати'
           )
         }
@@ -602,6 +682,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
       if (text === '/setup') {
+        if (chatId < 0) {
+          await tgSend(chatId,
+            'Перезаповнити профіль можна лише в особистих: @gb_household_chemicals_bot та /setup.'
+          )
+          return NextResponse.json({ ok: true })
+        }
         await supabase.from('telegram_pending_orders').delete().eq('telegram_user_id', tgUserId).eq('chat_id', chatId)
         await supabase.from('telegram_users').update({ display_name: null, phone: null, shop_id: null }).eq('id', tgUserId)
         await startOnboarding(supabase, chatId, tgUserId)
