@@ -100,18 +100,6 @@ async function tgAnswerCallback(callbackQueryId: string, text?: string) {
   } catch { /* ignore telegram send errors */ }
 }
 
-async function tgSetReaction(chatId: number, messageId: number, emoji: string) {
-  try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setMessageReaction`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId, message_id: messageId,
-        reaction: [{ type: 'emoji', emoji }],
-      }),
-    })
-  } catch { /* ignore telegram send errors */ }
-}
-
 const DEFAULT_WAREHOUSE_ID = 1
 
 async function getWarehouseForShop(supabase: SupabaseClient, shopId: number): Promise<number> {
@@ -600,7 +588,6 @@ export async function POST(req: NextRequest) {
       if (chatId < 0 && text.length > 0 && !text.startsWith('/') && !pending) {
         const parsed = await parseGroupOrder(supabase, text, tgUserId, chatId, messageId)
         if (parsed) {
-          await tgSetReaction(chatId, messageId, '👍')
           return NextResponse.json({ ok: true })
         }
       }
