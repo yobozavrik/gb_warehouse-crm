@@ -209,7 +209,7 @@ async function confirmOrder(supabase: SupabaseClient, chatId: number, messageId:
     p_telegram_user_id: tgUserId,
     p_shop_id: pending.shop_id,
     p_warehouse_id: warehouseId,
-    p_items: JSON.stringify(items.map(i => ({ product_id: i.product_id, quantity: i.quantity }))),
+    p_items: items.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
     p_notes: null,
     p_telegram_message_id: null,
   })
@@ -1119,7 +1119,7 @@ async function parseGroupOrder(
     p_telegram_user_id: tgUserId,
     p_shop_id: shopId,
     p_warehouse_id: warehouseId,
-    p_items: JSON.stringify(items),
+    p_items: items,
     p_notes: text.substring(0, 500),
     p_telegram_message_id: String(messageId),
   })
@@ -1200,7 +1200,7 @@ async function handleEditedOrderMessage(
   // Atomic replace via RPC
   const { data: result } = await supabase.rpc('rpc_telegram_replace_order_items', {
     p_order_id: order.id,
-    p_items: JSON.stringify(items),
+    p_items: items,
   })
   const res = result as any
   if (!res?.success) return
