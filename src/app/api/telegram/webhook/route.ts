@@ -100,6 +100,18 @@ async function tgAnswerCallback(callbackQueryId: string, text?: string) {
   } catch { /* ignore telegram send errors */ }
 }
 
+async function tgSetReaction(chatId: number, messageId: number, emoji: string) {
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setMessageReaction`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId, message_id: messageId,
+        reaction: [{ type: 'emoji', emoji }],
+      }),
+    })
+  } catch { /* ignore telegram send errors */ }
+}
+
 const DEFAULT_WAREHOUSE_ID = 1
 
 async function getWarehouseForShop(supabase: SupabaseClient, shopId: number): Promise<number> {
@@ -584,11 +596,11 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Груповий чат — парсинг заявок
-      if (chatId < 0 && text.length > 0 && !text.startsWith('/') && tgUserData.shop_id && !pending) {
-        const parsed = await parseGroupOrder(supabase, text, tgUserId, tgUserData.shop_id, chatId, messageId)
+      // Груповий чат — парсинг заявок (shop_id визначається з першого рядка)
+      if (chatId < 0 && text.length > 0 && !text.startsWith('/') && !pending) {
+        const parsed = await parseGroupOrder(supabase, text, tgUserId, chatId, messageId)
         if (parsed) {
-          await tgSend(chatId, parsed.reply)
+          await tgSetReaction(chatId, messageId, '👍')
           return NextResponse.json({ ok: true })
         }
       }
@@ -1002,11 +1014,50 @@ function matchProduct(searchText: string, products: any[], wordsList: Set<string
   return null
 }
 
+function normalizeForMatch(s: string): string {
+  return s.toLowerCase()
+    .replace(/^на\s+/i, '')
+    .replace(/[«»"„""']/g, '')
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .trim()
+}
+
+function matchShopByFirstLine(firstLine: string, shops: { id: number; name: string }[]): number | null {
+  const target = normalizeForMatch(firstLine)
+  if (target.length < 3) return null
+  let best: { id: number; score: number } | null = null
+  for (const s of shops) {
+    const cand = normalizeForMatch(s.name)
+    if (!cand) continue
+    let score = 0
+    if (cand === target) score = 100
+    else if (cand.includes(target) || target.includes(cand)) {
+      const shorter = Math.min(cand.length, target.length)
+      const longer = Math.max(cand.length, target.length)
+      score = 60 + (shorter / longer) * 30
+    }
+    if (score > 0 && (!best || score > best.score)) best = { id: s.id, score }
+  }
+  return best && best.score >= 60 ? best.id : null
+}
+
 async function parseGroupOrder(
   supabase: SupabaseClient, text: string, tgUserId: number,
-  shopId: number, chatId: number, messageId: number
-): Promise<{ reply: string } | null> {
-  // Fetch all active products
+  chatId: number, messageId: number
+): Promise<{ shopId: number } | null> {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length < 2) return null
+
+  const { data: shopsRaw } = await supabase
+    .from('shops')
+    .select('id, name')
+    .eq('is_active', true)
+  const shops = (shopsRaw as { id: number; name: string }[]) || []
+  if (!shops.length) return null
+
+  const shopId = matchShopByFirstLine(lines[0], shops)
+  if (!shopId) return null
+
   const { data: products } = await supabase
     .from('products')
     .select('id, name, sku, unit')
@@ -1015,31 +1066,20 @@ async function parseGroupOrder(
 
   const { wordsList, prefixCount } = buildIdfCache(products)
 
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
   const items: { product_id: number; quantity: number }[] = []
-  const matched: { prod: any; qty: number }[] = []
 
-  for (const line of lines) {
-    // Skip greetings/thanks
-    if (/^(На |Дякую|Добрий|дякую)/i.test(line)) continue
-
-    // Remove location prefix
-    let clean = line.replace(/^(Садова|Герцена|Компас|Героїв цех|Шкільна)[\s:,.!\-]*/i, '').trim()
-    clean = clean.replace(/\.$/, '').trim()
+  for (const line of lines.slice(1)) {
+    if (/^(Дякую|Добрий|дякую)/i.test(line)) continue
+    const clean = line.replace(/\.$/, '').trim()
     if (!clean) continue
-
     const qty = extractQty(clean) || 1
     const searchText = qty ? removeQtyFromText(clean, qty) : clean
     const finalSearch = searchText || removeQtyFromText(clean, null)
-
     const product = matchProduct(finalSearch, products, wordsList, prefixCount)
     if (!product) continue
     if (qty <= 0 || qty > 999999) continue
-
     items.push({ product_id: product.id, quantity: Math.round(qty) })
-    matched.push({ prod: product, qty: Math.round(qty) })
   }
-
   if (!items.length) return null
 
   // Dedupe: check if this message was already processed
@@ -1049,14 +1089,10 @@ async function parseGroupOrder(
     .eq('telegram_message_id', String(messageId))
     .eq('source', 'telegram')
     .maybeSingle()
-  if (existing) {
-    return { reply: `Заявка ${existing.order_number} вже створена за цим повідомленням.` }
-  }
+  if (existing) return { shopId }
 
-  // Find the warehouse for this shop
   const warehouseId = await getWarehouseForShop(supabase, shopId)
 
-  // Create order via RPC
   const { data: result } = await supabase.rpc('telegram_create_order', {
     p_telegram_user_id: tgUserId,
     p_shop_id: shopId,
@@ -1068,10 +1104,7 @@ async function parseGroupOrder(
   const res = result as any
   if (!res?.success) return null
 
-  const replyLines = matched.map(m => `${m.qty} ${m.prod.unit || 'шт'} ${m.prod.name}`)
-  return {
-    reply: `✅ Заявка ${res.order_number} створена\n\n${replyLines.join('\n')}\n\n/status ${res.order_number}`,
-  }
+  return { shopId }
 }
 
 async function handleEditedOrderMessage(
