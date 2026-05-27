@@ -26,6 +26,7 @@ export function getSupabase(): SupabaseClient {
   if (!_supabase) {
     _supabase = createClient(getSupabaseUrl(), getAnonKey(), {
       db: { schema: 'household_chemicals' },
+      global: { headers: { 'Content-Profile': 'household_chemicals' } },
     } as any)
   }
   return _supabase
@@ -35,6 +36,7 @@ export function getServiceSupabase(): SupabaseClient {
   if (!_serviceSupabase) {
     _serviceSupabase = createClient(getSupabaseUrl(), getServiceKey(), {
       db: { schema: 'household_chemicals' },
+      global: { headers: { 'Content-Profile': 'household_chemicals' } },
     } as any)
   }
   return _serviceSupabase

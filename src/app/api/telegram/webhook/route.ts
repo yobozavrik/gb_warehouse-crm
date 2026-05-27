@@ -65,6 +65,7 @@ function safeItems(items: unknown): any[] {
 }
 
 async function tgSend(chatId: number, text: string, parseMode?: string) {
+  if (chatId < 0) return // never send to group chats
   try {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -74,6 +75,7 @@ async function tgSend(chatId: number, text: string, parseMode?: string) {
 }
 
 async function tgSendMenu(chatId: number, text: string, buttons: { text: string; callback_data: string }[][]) {
+  if (chatId < 0) return // never send to group chats
   try {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -83,6 +85,7 @@ async function tgSendMenu(chatId: number, text: string, buttons: { text: string;
 }
 
 async function tgEditMenu(chatId: number, messageId: number, text: string, buttons: { text: string; callback_data: string }[][]) {
+  if (chatId < 0) return // never edit messages in group chats
   try {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1032,24 +1035,43 @@ async function parseGroupOrder(
   supabase: SupabaseClient, text: string, tgUserId: number,
   chatId: number, messageId: number
 ): Promise<{ shopId: number } | null> {
+  const parseLog: Record<string, any> = { matched_shop: null, found: [], not_found: [] }
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-  if (lines.length < 2) return null
+  if (lines.length < 2) {
+    parseLog.error = 'less than 2 lines'
+    await logParseResult(supabase, tgUserId, chatId, messageId, parseLog)
+    return null
+  }
 
   const { data: shopsRaw } = await supabase
     .from('shops')
     .select('id, name')
     .eq('is_active', true)
   const shops = (shopsRaw as { id: number; name: string }[]) || []
-  if (!shops.length) return null
+  if (!shops.length) {
+    parseLog.error = 'no active shops'
+    await logParseResult(supabase, tgUserId, chatId, messageId, parseLog)
+    return null
+  }
 
   const shopId = matchShopByFirstLine(lines[0], shops)
-  if (!shopId) return null
+  if (!shopId) {
+    parseLog.error = `shop not matched for line: "${lines[0]}"`
+    parseLog.available_shops = shops.map(s => s.name)
+    await logParseResult(supabase, tgUserId, chatId, messageId, parseLog)
+    return null
+  }
+  parseLog.matched_shop = shops.find(s => s.id === shopId)?.name || shopId
 
   const { data: products } = await supabase
     .from('products')
     .select('id, name, sku, unit')
     .eq('is_active', true)
-  if (!products || !products.length) return null
+  if (!products || !products.length) {
+    parseLog.error = 'no active products'
+    await logParseResult(supabase, tgUserId, chatId, messageId, parseLog)
+    return null
+  }
 
   const { wordsList, prefixCount } = buildIdfCache(products)
 
@@ -1063,20 +1085,33 @@ async function parseGroupOrder(
     const searchText = qty ? removeQtyFromText(clean, qty) : clean
     const finalSearch = searchText || removeQtyFromText(clean, null)
     const product = matchProduct(finalSearch, products, wordsList, prefixCount)
-    if (!product) continue
+    if (!product) {
+      parseLog.not_found.push({ line: clean, search: finalSearch })
+      continue
+    }
     if (qty <= 0 || qty > 999999) continue
     items.push({ product_id: product.id, quantity: Math.round(qty) })
+    parseLog.found.push({ product_id: product.id, name: product.name, qty: Math.round(qty) })
   }
-  if (!items.length) return null
+  if (!items.length) {
+    parseLog.error = 'no products matched'
+    await logParseResult(supabase, tgUserId, chatId, messageId, parseLog)
+    return null
+  }
 
-  // Dedupe: check if this message was already processed
+  // Dedupe
   const { data: existing } = await supabase
     .from('orders')
     .select('id, order_number')
     .eq('telegram_message_id', String(messageId))
     .eq('source', 'telegram')
     .maybeSingle()
-  if (existing) return { shopId }
+  if (existing) {
+    parseLog.error = 'duplicate — already processed'
+    parseLog.existing_order = existing.order_number
+    await logParseResult(supabase, tgUserId, chatId, messageId, parseLog)
+    return { shopId }
+  }
 
   const warehouseId = await getWarehouseForShop(supabase, shopId)
 
@@ -1089,9 +1124,34 @@ async function parseGroupOrder(
     p_telegram_message_id: String(messageId),
   })
   const res = result as any
-  if (!res?.success) return null
+  if (!res?.success) {
+    parseLog.error = `telegram_create_order failed: ${res?.error || 'unknown'}`
+    parseLog.rpc_result = res
+    await logParseResult(supabase, tgUserId, chatId, messageId, parseLog)
+    return null
+  }
 
+  parseLog.order_created = res.order_number
+  parseLog.items_count = items.length
+  await logParseResult(supabase, tgUserId, chatId, messageId, parseLog)
   return { shopId }
+}
+
+async function logParseResult(
+  supabase: SupabaseClient, tgUserId: number, chatId: number, messageId: number, data: Record<string, any>
+): Promise<void> {
+  try {
+    await supabase.rpc('telegram_log_message', {
+      p_telegram_user_id: tgUserId,
+      p_chat_id: chatId,
+      p_message_id: messageId,
+      p_message_type: 'parse_result',
+      p_text_content: null,
+      p_parsed_data: data,
+      p_processing_time_ms: null,
+      p_error: data.error || null,
+    })
+  } catch { /* ignore logging errors */ }
 }
 
 async function handleEditedOrderMessage(

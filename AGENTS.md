@@ -10,6 +10,7 @@
 - No separate backend – Supabase SDK + RPCs directly
 - User runs migrations manually via Supabase Studio SQL Editor
 - All pages use dynamic routes with sidebar navigation
+- User language: only russian
 - UI language: Ukrainian
 - Chart library: recharts installed
 - Poster API token: `<redacted>`
