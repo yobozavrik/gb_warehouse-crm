@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { confirmTransfer } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { useDialog } from '@/components/DialogProvider'
-import { MoveRight, CheckCircle } from 'lucide-react'
+import { MoveRight, CheckCircle, Plus } from 'lucide-react'
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -19,14 +20,18 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function TransfersPage() {
+  const router = useRouter()
   const dialog = useDialog()
   const [transfers, setTransfers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = () => {
     setLoading(true)
-    supabase.from('transfers').select('*, from_warehouse:from_warehouse_id(name), to_warehouse:to_warehouse_id(name)')
-      .order('created_at', { ascending: false }).then(r => {
+    supabase
+      .from('transfers')
+      .select('*, from_warehouse:from_warehouse_id(name), to_warehouse:to_warehouse_id(name)')
+      .order('created_at', { ascending: false })
+      .then(r => {
         setTransfers(r.data || [])
         setLoading(false)
       })
@@ -34,7 +39,8 @@ export default function TransfersPage() {
 
   useEffect(() => { load() }, [])
 
-  const handleConfirm = async (id: string) => {
+  const handleConfirm = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
     if (!(await dialog.confirm('Товари будуть списані з джерела і оприбутковані на отримувачі.', {
       title: 'Провести переміщення?',
       confirmText: 'Провести',
@@ -52,7 +58,16 @@ export default function TransfersPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Переміщення</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Переміщення</h1>
+        <button
+          onClick={() => router.push('/transfers/new')}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4" /> Нове переміщення
+        </button>
+      </div>
+
       {loading ? <p className="text-gray-500">Завантаження...</p> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
@@ -68,8 +83,12 @@ export default function TransfersPage() {
             </thead>
             <tbody>
               {transfers.map(t => (
-                <tr key={t.id} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{t.transfer_number}</td>
+                <tr
+                  key={t.id}
+                  className="border-t hover:bg-gray-50 cursor-pointer"
+                  onClick={() => router.push(`/transfers/${t.id}`)}
+                >
+                  <td className="px-4 py-3 font-medium text-blue-600">{t.transfer_number}</td>
                   <td className="px-4 py-3">{t.from_warehouse?.name}</td>
                   <td className="px-4 py-3">{t.to_warehouse?.name}</td>
                   <td className="px-4 py-3">
@@ -78,12 +97,14 @@ export default function TransfersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right text-gray-500">
-                    {new Date(t.created_at).toLocaleString('uk-UA')}
+                    {new Date(t.created_at).toLocaleDateString('uk-UA')}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {t.status === 'draft' && (
-                      <button onClick={() => handleConfirm(t.id)}
+                      <button
+                        onClick={(e) => handleConfirm(t.id, e)}
                         className="text-green-600 hover:text-green-800"
+                        title="Провести"
                       >
                         <CheckCircle className="w-5 h-5" />
                       </button>

@@ -368,6 +368,60 @@ export async function confirmOrder(orderId: string): Promise<RpcResult> {
 // ============================================================================
 // TRANSFERS / WRITE-OFFS / INVENTORY
 // ============================================================================
+export async function createTransferWithItems(input: {
+  from_warehouse_id: number
+  to_warehouse_id: number
+  notes?: string
+  items: { product_id: number; quantity: number }[]
+}): Promise<{ success: boolean; error?: string; transfer_id?: string; transfer_number?: string }> {
+  const { data, error } = await supabase.rpc('rpc_create_transfer_with_items', {
+    p_from_warehouse_id: input.from_warehouse_id,
+    p_to_warehouse_id: input.to_warehouse_id,
+    p_notes: input.notes ?? null,
+    p_items: input.items,
+    p_user_id: null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function fetchTransferDetail(transferId: string) {
+  const { data, error } = await supabase
+    .from('transfers')
+    .select('*, from_warehouse:from_warehouse_id(id, name), to_warehouse:to_warehouse_id(id, name), transfer_items(id, quantity, product:product_id(id, name, sku, unit))')
+    .eq('id', transferId)
+    .single()
+  if (error) throw error
+  return data as any
+}
+
+export async function createWriteOffWithItems(input: {
+  warehouse_id: number
+  reason: string
+  notes?: string
+  items: { product_id: number; quantity: number; notes?: string }[]
+}): Promise<{ success: boolean; error?: string; write_off_id?: string; write_off_number?: string }> {
+  const { data, error } = await supabase.rpc('rpc_create_write_off_with_items', {
+    p_warehouse_id: input.warehouse_id,
+    p_reason: input.reason,
+    p_notes: input.notes ?? null,
+    p_items: input.items,
+    p_user_id: null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function fetchWriteOffDetail(writeOffId: string) {
+  const { data, error } = await supabase
+    .from('write_offs')
+    .select('*, warehouse:warehouse_id(id, name), write_off_items(id, quantity, notes, product:product_id(id, name, sku, unit))')
+    .eq('id', writeOffId)
+    .single()
+  if (error) throw error
+  return data as any
+}
+
 export async function confirmTransfer(transferId: string): Promise<ConfirmTransferResult> {
   const { data, error } = await supabase.rpc('confirm_transfer', {
     p_transfer_id: transferId,
