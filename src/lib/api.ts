@@ -365,6 +365,42 @@ export async function confirmOrder(orderId: string): Promise<RpcResult> {
   return data
 }
 
+export async function cancelReceipt(receiptId: string): Promise<{ success: boolean; error?: string }> {
+  const { data, error } = await supabase.rpc('rpc_cancel_receipt', {
+    p_receipt_id: receiptId,
+    p_user_id: null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function updateReceiptItem(itemId: string, quantity: number, price?: number): Promise<{ success: boolean; error?: string }> {
+  const { data, error } = await supabase.rpc('rpc_update_receipt_item', {
+    p_item_id: itemId,
+    p_quantity: quantity,
+    p_price: price ?? null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function deleteReceiptItem(itemId: string): Promise<{ success: boolean; error?: string }> {
+  const { data, error } = await supabase.rpc('rpc_delete_receipt_item', { p_item_id: itemId })
+  if (error) throw error
+  return data
+}
+
+export async function addReceiptItem(receiptId: string, productId: number, quantity: number, price?: number): Promise<{ success: boolean; error?: string; item_id?: string }> {
+  const { data, error } = await supabase.rpc('rpc_add_receipt_item', {
+    p_receipt_id: receiptId,
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_price: price ?? null,
+  })
+  if (error) throw error
+  return data
+}
+
 // ============================================================================
 // TRANSFERS / WRITE-OFFS / INVENTORY
 // ============================================================================
