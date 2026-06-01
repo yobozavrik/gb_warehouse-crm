@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { fetchOrderDetail, updateOrderItem, addOrderItem, removeOrderItem, confirmOrder } from '@/lib/api'
 import { fetchProducts } from '@/lib/api'
 import { useDialog } from '@/components/DialogProvider'
-import { ArrowLeft, Check, Plus, Trash2, Truck } from 'lucide-react'
+import { ArrowLeft, Check, Plus, Printer, Trash2, Truck } from 'lucide-react'
 
 const statusLabels: Record<string, string> = {
   draft: 'Чернетка', submitted: 'Очікує', confirmed: 'Підтверджено',
@@ -49,6 +49,7 @@ export default function OrderDetailPage() {
   useEffect(() => { load() }, [id])
 
   const canEdit = order && !['shipped', 'cancelled'].includes(order.order?.status)
+  const canPrint = order && ['confirmed', 'partially_shipped', 'shipped'].includes(order.order?.status)
 
   const handleUpdateQty = async (itemId: string) => {
     const qty = parseFloat(editQty)
@@ -134,21 +135,37 @@ export default function OrderDetailPage() {
 
   return (
     <div className="space-y-6">
-      <button onClick={() => router.push('/orders')} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm">
+      <button onClick={() => router.push('/orders')} className="print:hidden flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm">
         <ArrowLeft className="w-4 h-4" /> Назад до заявок
       </button>
+
+      {/* Print-only document header */}
+      <div className="hidden print:block text-center pb-2 border-b border-gray-300">
+        <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Галя Балувана — Складський облік</p>
+        <h1 className="text-xl font-bold text-gray-900">Заявка {o.order_number}</h1>
+      </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{o.order_number}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 print:hidden">{o.order_number}</h1>
             <p className="text-sm text-gray-500 mt-1">
               {o.shop_name} &middot; {o.warehouse_name}
             </p>
           </div>
-          <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${statusColors[o.status] || ''}`}>
-            {statusLabels[o.status] || o.status}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${statusColors[o.status] || ''}`}>
+              {statusLabels[o.status] || o.status}
+            </span>
+            {canPrint && (
+              <button
+                onClick={() => window.print()}
+                className="print:hidden flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm border border-gray-300 px-3 py-1.5 rounded-lg"
+              >
+                <Printer className="w-4 h-4" /> Друкувати
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4 text-sm text-gray-600 mt-2">
@@ -163,7 +180,7 @@ export default function OrderDetailPage() {
         <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">Позиції ({items.length})</h2>
           {canEdit && (
-            <button onClick={openAddItem} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium">
+            <button onClick={openAddItem} className="print:hidden flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium">
               <Plus className="w-4 h-4" /> Додати товар
             </button>
           )}
@@ -172,16 +189,18 @@ export default function OrderDetailPage() {
         <table className="w-full text-sm">
           <thead className="text-gray-500">
             <tr>
+              <th className="hidden print:table-cell px-4 py-3 font-medium text-center w-8">№</th>
               <th className="text-left px-4 py-3 font-medium">Товар</th>
               <th className="text-left px-4 py-3 font-medium">Од.</th>
               <th className="text-right px-4 py-3 font-medium">Запитувалось</th>
               <th className="text-right px-4 py-3 font-medium">Відвантажено</th>
-              {canEdit && <th className="px-4 py-3"></th>}
+              {canEdit && <th className="px-4 py-3 print:hidden"></th>}
             </tr>
           </thead>
           <tbody>
-            {items.map((item: any) => (
+            {items.map((item: any, idx: number) => (
               <tr key={item.id} className="border-t hover:bg-gray-50">
+                <td className="hidden print:table-cell px-4 py-3 text-center text-gray-400">{idx + 1}</td>
                 <td className="px-4 py-3 font-medium">{item.product_name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.unit || 'шт'}</td>
                 <td className="px-4 py-3 text-right">
@@ -200,7 +219,7 @@ export default function OrderDetailPage() {
                 </td>
                 <td className="px-4 py-3 text-right text-gray-500">{item.quantity_shipped || 0}</td>
                 {canEdit && (
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right print:hidden">
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => { setEditingId(item.id); setEditQty(String(item.quantity_requested)) }}
                         className="text-blue-500 hover:text-blue-700 text-xs">Змінити</button>
@@ -216,7 +235,7 @@ export default function OrderDetailPage() {
       </div>
 
       {showAddItem && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div className="print:hidden bg-white rounded-xl border border-gray-200 p-4 space-y-3">
           <h3 className="font-semibold text-gray-900">Додати товар</h3>
           <input type="text" placeholder="Пошук товару..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -258,8 +277,23 @@ export default function OrderDetailPage() {
         </div>
       )}
 
+      {/* Print-only signature footer */}
+      <div className="hidden print:block mt-10 pt-6 border-t border-gray-300 text-sm text-gray-700">
+        <div className="flex justify-between gap-12">
+          <div>
+            Видав: <span className="inline-block border-b border-gray-500 w-44">&nbsp;</span>
+          </div>
+          <div>
+            Прийняв: <span className="inline-block border-b border-gray-500 w-44">&nbsp;</span>
+          </div>
+          <div>
+            Дата: <span className="inline-block border-b border-gray-500 w-32">&nbsp;</span>
+          </div>
+        </div>
+      </div>
+
       {canEdit && (
-        <div className="flex justify-end">
+        <div className="print:hidden flex justify-end">
           <button onClick={handleConfirm} disabled={saving || items.length === 0}
             className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50">
             <Truck className="w-5 h-5" /> Провести заявку

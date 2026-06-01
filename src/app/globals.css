@@ -24,6 +24,21 @@
   --color-text-tertiary: #94a3b8;
 }
 
+@media print {
+  #app-root {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  aside {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

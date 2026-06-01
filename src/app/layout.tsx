@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="uk" suppressHydrationWarning className={inter.variable}>
       <body className="min-h-screen bg-[var(--color-surface-subtle)]">
         <DialogProvider>
-          <div className="flex h-screen overflow-hidden">
+          <div id="app-root" className="flex h-screen overflow-hidden">
             <Sidebar />
             <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
               {children}
